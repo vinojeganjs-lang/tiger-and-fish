@@ -66,6 +66,20 @@
   #touch button { position:absolute; pointer-events:auto; width:62px; height:62px; border-radius:50%; border:2px solid rgba(255,255,255,0.35); background:rgba(0,0,0,0.35); color:#fff; font-weight:800; font-size:12px; font-family:inherit; }
   #touch .atk { right:24px; bottom:44px; width:74px; height:74px; } #touch .hvy { right:108px; bottom:100px; } #touch .dodge { right:108px; bottom:24px; } #touch .stone { right:24px; bottom:136px; } #touch .sneak { right:190px; bottom:60px; }
   #touch button.on { background:rgba(201,161,92,0.6); }
+  #banner { position:absolute; top:22%; left:0; right:0; text-align:center; opacity:0; transition:opacity .25s; }
+  #banner-t { font-size:34px; font-weight:800; letter-spacing:6px; color:#ece6da; text-shadow:0 2px 20px #000, 0 0 40px rgba(201,161,92,0.4); }
+  #banner-s { font-size:14px; color:#d9b48a; letter-spacing:2px; margin-top:6px; text-shadow:0 1px 8px #000; }
+  #combo { position:absolute; right:26px; top:110px; font-size:28px; font-weight:800; color:#ffb040; text-shadow:0 2px 12px #000; transform-origin:right center; }
+  #ragewrap { position:absolute; left:50%; bottom:64px; transform:translateX(-50%); width:220px; height:6px; background:rgba(0,0,0,0.6); border-radius:3px; border:1px solid rgba(255,255,255,0.15); overflow:hidden; }
+  #rage { display:block; height:100%; width:0; background:#c9a15c; transition:width .15s; }
+  #ragelbl { position:absolute; left:50%; bottom:74px; transform:translateX(-50%); font-size:9px; letter-spacing:3px; color:#9a8a6a; }
+  #ragefx { position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(220,80,20,0.55) 100%); opacity:0; transition:opacity .4s; mix-blend-mode:screen; }
+  #waypoint { position:absolute; transform:translate(-50%,-50%); font-size:13px; font-weight:700; color:#f0d9a8; text-shadow:0 1px 8px #000; opacity:0; transition:opacity .3s; letter-spacing:1px; }
+  #bossbar { position:absolute; top:18px; left:50%; transform:translateX(-50%); width:min(520px,70vw); opacity:0; transition:opacity .4s; text-align:center; }
+  #bossbar .n { font-size:10px; letter-spacing:4px; color:#e07060; font-weight:700; margin-bottom:4px; }
+  #bossbar .b { height:8px; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); border-radius:4px; overflow:hidden; }
+  #bossbar .b i { display:block; height:100%; width:100%; background:#c94a3a; transition:width .2s; }
+  #touch .rage { right:190px; bottom:130px; font-size:11px; }
   #fps { position:fixed; top:12px; left:50%; transform:translateX(-50%); font-size:11px; color:#666; z-index:20; }
 </style>
 <script type="importmap">{ "imports": { "three": "./three.module.js", "three/addons/postprocessing/": "./", "three/addons/shaders/": "./" } }</script>
@@ -84,12 +98,18 @@
   <div id="dialog"><div class="sp" id="dlg-sp"></div><div class="tx" id="dlg-tx"></div></div>
   <div id="noise">silent</div>
   <div id="hint"></div>
+  <div id="banner"><div id="banner-t"></div><div id="banner-s"></div></div>
+  <div id="combo"></div>
+  <div id="ragelbl">TIGER</div><div id="ragewrap"><i id="rage"></i></div>
+  <div id="ragefx"></div>
+  <div id="waypoint"></div>
+  <div id="bossbar"><div class="n">THE ELDER HUNTER</div><div class="b"><i id="bossbar-i"></i></div></div>
 </div>
 
 <div id="lobby" class="overlay">
   <div class="card" style="position:relative">
     <div class="lang"><button id="lang-en">EN</button><button id="lang-ta">தமிழ்</button></div>
-    <h1><small>3D PROOF OF CONCEPT · TRIAL II</small>The Tiger and the Fish</h1>
+    <h1><small>3D · TRIAL II · AMBUSH BUILD</small>The Tiger and the Fish</h1>
     <div class="tamil">புலியும் மீனும் — குருட்டு வேட்டைக்காரர்கள். 3D.</div>
     <p class="lead" data-en="Third-person co-op in a blind forest. The hunters have no eyes — they hear. Sneak, throw stones, and when they find you: fight. Kumaran carries the boat-hook. Selvam carries the stick and the stones." data-ta="கண் இல்லாத காட்டுல third-person co-op. வேட்டைக்காரர்களுக்கு காது மட்டும். பதுங்கு, கல் எறி, கண்டுபிடிச்சா — சண்டை. குமரன் கையில படகு கொக்கி. செல்வம் கையில கம்பு, கல்.">Third-person co-op in a blind forest.</p>
     <div id="join-box">
@@ -107,7 +127,7 @@
     <div id="lobby-status"></div>
     <div class="divider"></div>
     <div class="howto">
-      <b>Controls</b> — <kbd>W A S D</kbd> move · <kbd>Shift</kbd> sneak (quiet) · <kbd>Space</kbd> dodge · <kbd>J</kbd>/<kbd>click</kbd> attack · <kbd>K</kbd>/<kbd>right click</kbd> heavy · <kbd>E</kbd> throw stone · drag mouse to look<br>
+      <b>Controls</b> — <kbd>W A S D</kbd> move · <kbd>Shift</kbd> sneak (quiet) · <kbd>Space</kbd> dodge · <kbd>J</kbd>/<kbd>click</kbd> attack · <kbd>K</kbd>/<kbd>right click</kbd> heavy · <kbd>E</kbd> stone / silent kill / revive · <kbd>R</kbd> Tiger · drag mouse to look<br>
       <span data-en="Phones: joystick + buttons appear. Both players need this page open." data-ta="Phone-ல joystick + buttons வரும். ரெண்டு பேரும் இந்த page-ஐ திறக்கணும்.">Phones: joystick + buttons appear.</span>
     </div>
   </div>
@@ -118,7 +138,7 @@
 
 <div id="touch" class="hidden">
   <div id="stick"><i></i></div>
-  <button class="atk" data-btn="atk">ATK</button><button class="hvy" data-btn="hvy">HEAVY</button><button class="dodge" data-btn="dodge">DODGE</button><button class="stone" data-btn="stone">STONE</button><button class="sneak" data-btn="sneak">SNEAK</button>
+  <button class="atk" data-btn="atk">ATK</button><button class="hvy" data-btn="hvy">HEAVY</button><button class="dodge" data-btn="dodge">DODGE</button><button class="stone" data-btn="stone">STONE</button><button class="sneak" data-btn="sneak">SNEAK</button><button class="rage" data-btn="rage">TIGER</button>
 </div>
 
 <script src="../peerjs.min.js"></script>
