@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>The Tiger and the Fish — புலியும் மீனும்</title>
+<meta name="description" content="A 2-player online co-op adventure through seven trials to a lost Tamil kingdom. Play with a friend on separate devices.">
+<meta property="og:title" content="The Tiger and the Fish">
+<meta property="og:description" content="Two friends. Seven trials. One lost kingdom. A 2-player online co-op game.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0a0c0e; --paper:#ece6da; --gold:#c9a15c; --teal:#8fc0c8; --rust:#c94a3a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#000; color:var(--paper); font-family:"Inter","Noto Sans Tamil",system-ui,sans-serif; overflow:hidden; -webkit-user-select:none; user-select:none; }
+  #wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#000; }
+  canvas#game { display:block; background:#000; image-rendering:auto; }
+  .hidden { display:none !important; }
+  /* overlays */
+  .overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10; }
+  #lobby { background:rgba(4,6,8,0.55); }
+  .card { width:min(560px,92vw); background:rgba(8,10,12,0.86); border:1px solid rgba(201,161,92,0.35); border-radius:10px; padding:28px 30px; box-shadow:0 30px 80px rgba(0,0,0,0.7); backdrop-filter:blur(6px); }
+  h1 { margin:0; font-size:34px; letter-spacing:1px; font-weight:800; line-height:1.05; }
+  h1 small { display:block; font-size:16px; color:var(--gold); font-weight:600; letter-spacing:3px; margin-bottom:8px; }
+  .tamil { font-family:"Noto Sans Tamil","Inter",sans-serif; color:#b9b0a0; font-size:15px; margin-top:6px; }
+  .lang { position:absolute; top:14px; right:16px; display:flex; gap:6px; }
+  .lang button, .icons button { background:transparent; border:1px solid rgba(255,255,255,0.25); color:#ddd; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; }
+  .lang button.on { background:var(--gold); color:#111; border-color:var(--gold); font-weight:700; }
+  p.lead { color:#c8c0b0; font-size:14px; line-height:1.5; margin:14px 0 18px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn { background:var(--gold); color:#111; border:none; padding:12px 18px; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; letter-spacing:0.5px; }
+  .btn.ghost { background:transparent; color:var(--paper); border:1px solid rgba(255,255,255,0.3); }
+  .btn:disabled { opacity:0.5; cursor:default; }
+  input.code { width:120px; padding:10px 12px; font-size:20px; letter-spacing:6px; text-transform:uppercase; background:#111; color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:6px; font-family:inherit; text-align:center; }
+  input.link { flex:1; min-width:180px; padding:8px 10px; font-size:12px; background:#111; color:#aaa; border:1px solid rgba(255,255,255,0.2); border-radius:6px; font-family:inherit; }
+  #room-code { font-size:44px; letter-spacing:12px; font-weight:800; color:var(--gold); margin:8px 0 4px; }
+  #lobby-status { color:#b9b0a0; font-size:13px; min-height:18px; margin-top:12px; }
+  .divider { height:1px; background:rgba(255,255,255,0.1); margin:16px 0; }
+  .howto { font-size:12px; color:#9a9284; line-height:1.55; }
+  .howto b { color:#ddd; }
+  kbd { background:#222; border:1px solid #444; border-radius:4px; padding:1px 6px; font-size:11px; color:#eee; font-family:inherit; }
+  .icons { position:fixed; top:12px; left:14px; z-index:20; display:flex; gap:6px; }
+  #btn-mute.muted::after { content:" ✕"; }
+  /* rule card */
+  #rules .card { width:min(680px,94vw); }
+  #rules h2 { margin:0 0 12px; color:var(--gold); letter-spacing:3px; font-size:16px; }
+  #rules ol { margin:0 0 18px; padding-left:20px; font-size:15px; line-height:1.55; color:#e0d8c8; }
+  #rules li { margin-bottom:8px; }
+  #rules li::marker { color:var(--gold); font-weight:700; }
+  /* end card */
+  #endcard .card { text-align:center; }
+  #end-text { white-space:pre-line; color:#d8d0c0; font-size:15px; line-height:1.6; }
+  /* touch controls */
+  #touch { position:fixed; inset:0; pointer-events:none; z-index:15; }
+  #touch button { position:absolute; pointer-events:auto; width:64px; height:64px; border-radius:50%; border:2px solid rgba(255,255,255,0.35); background:rgba(0,0,0,0.35); color:#fff; font-weight:800; font-size:18px; font-family:inherit; touch-action:none; }
+  #touch button.on { background:rgba(201,161,92,0.6); }
+  #touch .l { left:18px; bottom:32px; } #touch .r { left:100px; bottom:32px; } #touch .up { left:59px; bottom:110px; }
+  #touch .jump { right:18px; bottom:32px; } #touch .act { right:100px; bottom:32px; } #touch .sp { right:59px; bottom:110px; font-size:12px; }
+  @media (max-width:600px) { h1 { font-size:26px; } .card { padding:20px 18px; } }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+
+<div class="icons"><button id="btn-mute" title="Mute">♪</button><button id="btn-fs" title="Fullscreen">⛶</button></div>
+
+<div id="lobby" class="overlay">
+  <div class="card" style="position:relative">
+    <div class="lang"><button id="lang-en">EN</button><button id="lang-ta">தமிழ்</button></div>
+    <h1><small data-en="A 2-PLAYER CO-OP ADVENTURE" data-ta="2-PLAYER CO-OP ADVENTURE">A 2-PLAYER CO-OP ADVENTURE</small>The Tiger and the Fish</h1>
+    <div class="tamil">புலியும் மீனும் — ஏழு சோதனைகள். ஒரு தொலைந்த அரசு.</div>
+    <p class="lead" data-en="Two friends from a Chennai harbour sign on with an expedition and walk into a 750-year-old prophecy. One of you is Kumaran. One of you is Selvam. Every trial needs both of you." data-ta="சென்னை துறைமுகத்து ரெண்டு நண்பர்கள் ஒரு ஆய்வுப் பயணத்தில் சேர்ந்து 750 வருஷப் பழைய ஒரு தீர்க்கதரிசனத்துக்குள் நடந்து போறாங்க. ஒருத்தர் குமரன். ஒருத்தர் செல்வம். ஒவ்வொரு சோதனைக்கும் ரெண்டு பேரும் வேணும்.">Two friends from a Chennai harbour sign on with an expedition and walk into a 750-year-old prophecy. One of you is Kumaran. One of you is Selvam. Every trial needs both of you.</p>
+    <div id="join-box">
+      <div class="row">
+        <button id="btn-create" class="btn" data-en="Create a room (play as Kumaran)" data-ta="Room உருவாக்கு (குமரனாக)">Create a room (play as Kumaran)</button>
+      </div>
+      <div class="divider"></div>
+      <div class="row">
+        <input id="join-code" class="code" maxlength="4" placeholder="CODE" autocomplete="off">
+        <button id="btn-join" class="btn ghost" data-en="Join a room (play as Selvam)" data-ta="Room-ல சேர் (செல்வமாக)">Join a room (play as Selvam)</button>
+      </div>
+    </div>
+    <div id="room-box" class="hidden">
+      <div style="font-size:11px;letter-spacing:3px;color:#9a9284" data-en="ROOM CODE" data-ta="ROOM CODE">ROOM CODE</div>
+      <div id="room-code">----</div>
+      <div class="row"><input id="room-link" class="link" readonly><button id="btn-copy" class="btn ghost" style="padding:8px 12px">Copy</button></div>
+    </div>
+    <div id="lobby-status"></div>
+    <div class="divider"></div>
+    <div class="howto">
+      <b data-en="Controls" data-ta="Controls">Controls</b> — <kbd>←</kbd><kbd>→</kbd> <span data-en="move" data-ta="நகர்">move</span> · <kbd>↑</kbd>/<kbd>Space</kbd> <span data-en="jump / climb" data-ta="குதி / ஏறு">jump / climb</span> · <kbd>Shift</kbd> <span data-en="hold / brace" data-ta="பிடி / தாங்கு">hold / brace</span> · <kbd>E</kbd> <span data-en="interact / throw" data-ta="தொடு / எறி">interact / throw</span><br>
+      <span data-en="Works on phones too (touch buttons appear). Both players need this page open. No account, no download." data-ta="Phone-லயும் விளையாடலாம் (touch buttons வரும்). ரெண்டு பேரும் இந்த page-ஐ திறக்கணும். Account இல்ல, download இல்ல.">Works on phones too (touch buttons appear). Both players need this page open. No account, no download.</span>
+    </div>
+  </div>
+</div>
+
+<div id="rules" class="overlay hidden">
+  <div class="card">
+    <h2 id="rules-title">TRIAL</h2>
+    <ol id="rules-lines"></ol>
+    <div class="row" style="justify-content:flex-end"><button id="rules-ok" class="btn" data-en="I understand — ready" data-ta="புரிஞ்சது — தயார்">I understand — ready</button></div>
+  </div>
+</div>
+
+<div id="endcard" class="overlay hidden">
+  <div class="card">
+    <h2 id="end-title" style="color:var(--gold);letter-spacing:4px;font-size:16px;margin:0 0 10px">END</h2>
+    <div id="end-text"></div>
+    <div class="divider"></div>
+    <button id="btn-again" class="btn" data-en="Play again" data-ta="மறுபடியும் விளையாடு">Play again</button>
+  </div>
+</div>
+
+<div id="touch" class="hidden">
+  <button class="l" data-btn="l">◀</button><button class="r" data-btn="r">▶</button><button class="up" data-btn="up">▲</button>
+  <button class="jump" data-btn="jump">↑</button><button class="act" data-btn="act">E</button><button class="sp" data-btn="sp">HOLD</button>
+</div>
+
+<script src="peerjs.min.js"></script>
+<script src="util.js"></script>
+<script src="audio.js"></script>
+<script src="art.js"></script>
+<script src="net.js"></script>
+<script src="engine.js"></script>
+<script src="story.js"></script>
+<script src="scenes.js"></script>
+<script src="trials.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
