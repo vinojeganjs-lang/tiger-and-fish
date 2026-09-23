@@ -119,7 +119,21 @@ function makeRig(kind) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), skin); head.position.y = 0.16; head.scale.set(0.9, 1.1, 0.95); head.castShadow = true; neck.add(head);
   if (kind === 'S') { const band = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 14), MAT.red); band.rotation.x = Math.PI / 2; band.position.y = 0.2; neck.add(band); }
   if (kind === 'M') { const hair = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), MAT.dark); hair.position.set(0, 0.2, -0.05); hair.scale.set(1, 0.9, 1.1); neck.add(hair); const tail = box(0.08, 0.35, 0.08, MAT.dark, 0, 0.02, -0.18); neck.add(tail); }
-  if (kind === 'K') { const bag = box(0.28, 0.42, 0.16, MAT.wood, 0, 0.35, -0.24); hips.add(bag); }
+  // shoulders / neck definition
+  for (const sx of [-1, 1]) { const del = new THREE.Mesh(new THREE.SphereGeometry(0.11 * broad, 8, 6), kind === 'M' ? cloth : skin); del.position.set(sx * 0.3 * broad, 0.63, 0); del.castShadow = true; hips.add(del); }
+  { const neckC = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.12, 8), skin); neckC.position.y = 0.03; neck.add(neckC); }
+  // Kumaran's tiger mark — a golden pounce of stripes across his back
+  let mark = null;
+  if (kind === 'K') {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 160; const x = c.getContext('2d');
+    x.strokeStyle = '#ffc24a'; x.lineCap = 'round'; x.lineWidth = 9;
+    const strokes = [[20, 130, 55, 88, 96, 74], [26, 100, 60, 66, 100, 52], [40, 74, 72, 46, 104, 36], [62, 132, 88, 108, 112, 92], [86, 140, 102, 120, 116, 108]];
+    for (const [x1, y1, cx2, cy2, x2, y2] of strokes) { x.beginPath(); x.moveTo(x1, y1); x.quadraticCurveTo(cx2, cy2, x2, y2); x.stroke(); }
+    x.lineWidth = 6; x.beginPath(); x.arc(100, 44, 9, 0, 6.28); x.stroke(); // the eye of the leap
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const mm = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+    mark = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.38), mm); mark.position.set(0, 0.42, -0.205); mark.rotation.y = Math.PI; hips.add(mark);
+  }
   const mk = (side) => { const sh = new THREE.Group(); sh.position.set(side * 0.3 * broad, 0.62, 0); hips.add(sh); const up = limb(0.34, 0.11 * broad, skin); sh.add(up); const el = new THREE.Group(); el.position.y = -0.34; up.add(el); const fo = limb(0.32, 0.095 * broad, skin); el.add(fo); const hand = new THREE.Group(); hand.position.y = -0.32; fo.add(hand); return { sh, up, el, fo, hand }; };
   const Lm = mk(-1), R = mk(1);
   const mkLeg = (side) => { const hp = new THREE.Group(); hp.position.set(side * 0.13 * broad, -0.02, 0); hips.add(hp); const th = limb(0.48, 0.15 * broad, cloth); hp.add(th); const kn = new THREE.Group(); kn.position.y = -0.48; th.add(kn); const sh = limb(0.46, 0.12 * broad, skin); kn.add(sh); const foot = box(0.12, 0.08, 0.26, MAT.dark, 0, -0.46, 0.06); kn.add(foot); return { hp, th, kn, sh }; };
@@ -129,7 +143,7 @@ function makeRig(kind) {
   if (kind === 'S') { weapon = new THREE.Group(); const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.3, 6), MAT.wood); stick.position.y = 0.3; weapon.add(stick); weapon.rotation.x = Math.PI / 2 + 0.2; R.hand.add(weapon); }
   // hand torch (hidden unless level enables)
   const htorch = new THREE.Group(); { const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.7, 5), MAT.wood); stick.position.y = 0.2; htorch.add(stick); const fl = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 6), MAT.flame); fl.position.y = 0.65; htorch.add(fl); htorch.visible = false; htorch.rotation.x = Math.PI / 2 + 0.3; Lm.hand.add(htorch); }
-  return { g, hips, torso, neck, head, L: Lm, R, LL, RL, weapon, htorch, kind };
+  return { g, hips, torso, neck, head, L: Lm, R, LL, RL, weapon, htorch, mark, kind };
 }
 function poseRig(r, a) {
   const s = (v) => Math.sin(v); const st = a.t;
@@ -178,10 +192,10 @@ function poseRig(r, a) {
 
 // ---------------- enemy types & rigs ----------------
 const ETYPES = {
-  stalker: { hp: 3, speed: 7.0, scale: 0.8, windup: 0.32, dmg: 1, reach: 2.0, color: 0x1a2420, poise: 0 },
-  hunter: { hp: 5, speed: 5.6, scale: 1.0, windup: 0.45, dmg: 1, reach: 2.3, color: 0x141a16, poise: 0 },
-  brute: { hp: 14, speed: 3.9, scale: 1.55, windup: 0.85, dmg: 2, reach: 3.4, color: 0x1e1a14, poise: 2, aoe: true },
-  boss: { hp: 42, speed: 4.6, scale: 2.1, windup: 0.75, dmg: 2, reach: 4.2, color: 0x241410, poise: 3, aoe: true, boss: true },
+  stalker: { hp: 4, speed: 7.2, scale: 0.8, windup: 0.3, dmg: 1, reach: 2.0, color: 0x1a2420, poise: 0 },
+  hunter: { hp: 7, speed: 5.8, scale: 1.0, windup: 0.42, dmg: 1, reach: 2.3, color: 0x141a16, poise: 0 },
+  brute: { hp: 18, speed: 4.1, scale: 1.55, windup: 0.8, dmg: 2, reach: 3.4, color: 0x1e1a14, poise: 2, aoe: true },
+  boss: { hp: 52, speed: 4.8, scale: 2.1, windup: 0.72, dmg: 2, reach: 4.2, color: 0x241410, poise: 3, aoe: true, boss: true },
 };
 const BRAINS = {};   // type -> fn(h, dt, players)
 function regType(name, def) { ETYPES[name] = def; }
@@ -190,6 +204,7 @@ function makeHunter(type) {
   const T_ = ETYPES[type];
   if (T_.rig === 'croc') return makeCroc(T_);
   if (T_.rig === 'snake') return makeSnake(T_);
+  if (T_.rig === 'beast') return makeBeast(T_);
   const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.95, emissive: 0x000000 });
   if (T_.emissive) { m.emissive.setHex(T_.emissive); m.emissiveIntensity = 0.35; }
   const body = new THREE.Group(); body.position.y = 1.0; g.add(body);
@@ -263,9 +278,50 @@ function poseSnake(r, h, gt) {
   const flash = (h.state === 'coil') ? (0.3 + 0.7 * Math.abs(s(gt * 24))) * U.clamp(h.st / h.windup, 0, 1) : h.flashT > 0 ? h.flashT * 3 : 0;
   r.mat.emissive.setRGB(flash * 0.9, flash * 0.1, flash * 0.05);
 }
+function makeBeast(T_) {
+  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.9, emissive: 0x000000 });
+  const belly = T_.belly ? new THREE.MeshStandardMaterial({ color: T_.belly, roughness: 0.95 }) : m;
+  const body = new THREE.Group(); body.position.y = 0.62; g.add(body);
+  const trunk = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.75, 4, 8), m); trunk.rotation.x = Math.PI / 2; trunk.scale.set(1, 0.92, 1.12); trunk.castShadow = true; body.add(trunk);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 7), m); chest.position.set(0, 0.03, 0.42); chest.scale.set(0.95, 1, 0.9); chest.castShadow = true; body.add(chest);
+  const haunch = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 7), m); haunch.position.set(0, 0.02, -0.4); haunch.scale.set(1, 0.95, 1.1); haunch.castShadow = true; body.add(haunch);
+  const bellyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.5, 3, 6), belly); bellyM.rotation.x = Math.PI / 2; bellyM.position.y = -0.12; body.add(bellyM);
+  const neck = new THREE.Group(); neck.position.set(0, 0.14, 0.58); body.add(neck);
+  const nk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.3, 7), m); nk.rotation.x = 1.1; nk.position.set(0, 0.06, 0.08); nk.castShadow = true; neck.add(nk);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 9, 7), m); head.position.set(0, 0.14, 0.22); head.scale.set(0.85, 0.9, 1.05); head.castShadow = true; neck.add(head);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.1, 0.22), m); snout.position.set(0, 0.09, 0.38); neck.add(snout);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.045, 0.16), m); jaw.position.set(0, 0.02, 0.36); neck.add(jaw);
+  for (const sx of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 4), m); ear.position.set(sx * 0.09, 0.27, 0.14); ear.rotation.x = -0.3; neck.add(ear); const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 5, 5), MAT.eye); eye.position.set(sx * 0.07, 0.17, 0.32); eye.visible = false; neck.add(eye); if (sx === 1) var eyeR = eye; else var eyeL = eye; }
+  const tail = new THREE.Group(); tail.position.set(0, 0.1, -0.62); body.add(tail);
+  const tl = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.05, 0.5, 5), m); tl.rotation.x = -2.2; tl.position.set(0, 0.12, -0.16); tl.castShadow = true; tail.add(tl);
+  const mkLeg = (sx, z, front) => { const hp = new THREE.Group(); hp.position.set(sx * 0.2, -0.08, z); body.add(hp); const th = limb(0.34, 0.11, m); hp.add(th); const kn = new THREE.Group(); kn.position.y = -0.34; th.add(kn); const sh = limb(0.3, 0.07, m); kn.add(sh); const paw = box(0.09, 0.05, 0.14, m, 0, -0.3, 0.03); kn.add(paw); return { hp, th, kn, sh, front }; };
+  const rig = { g, body, neck, tail, mat: m, eye: { get visible() { return eyeL.visible; }, set visible(v) { eyeL.visible = eyeR.visible = v; } }, legs: [mkLeg(-1, 0.42, 1), mkLeg(1, 0.42, 1), mkLeg(-1, -0.42, 0), mkLeg(1, -0.42, 0)], custom: 'beast' };
+  g.scale.setScalar(T_.scale || 1);
+  return rig;
+}
+function poseBeast(r, h, gt) {
+  const s = Math.sin; const set = (o, x, y, z) => o.rotation.set(x, y, z);
+  const moving = ['chase', 'investigate', 'patrol', 'charge', 'frenzy', 'reposition'].includes(h.state);
+  const run = h.state === 'chase' || h.state === 'frenzy' || h.state === 'charge';
+  const ph = h.ph; const amp = moving ? (run ? 1.0 : 0.5) : 0;
+  r.body.position.y = 0.62 + (moving ? Math.abs(s(ph)) * (run ? 0.09 : 0.035) : s(gt * 1.8) * 0.015);
+  set(r.body, 0, 0, 0); set(r.neck, 0, 0, 0); set(r.tail, 0, s(gt * (moving ? 8 : 2)) * 0.4, 0);
+  r.legs.forEach((lg, i) => { const pair = (i === 0 || i === 3) ? 0 : Math.PI; set(lg.hp, s(ph + pair) * amp * 0.85, 0, 0); set(lg.kn, 0.25 + Math.max(0, -s(ph + pair - 0.6)) * amp * 0.9, 0, 0); });
+  const wu = h.windup || 0.3, atkDur = wu + 0.3;
+  if (h.state === 'listen') { set(r.neck, -0.25 + s(gt * 2.6) * 0.08, s(gt * 1.2) * 0.7, 0); }
+  else if (h.state === 'rise') { const k = U.clamp(h.st / 0.7, 0, 1); r.body.position.y = U.lerp(0.1, 0.62, U.smooth(k)); set(r.body, -0.6 * (1 - k), 0, 0); set(r.neck, -0.5 * s(k * Math.PI), 0, 0); }
+  else if (h.state === 'attack') { const k = U.clamp(h.st / atkDur, 0, 1); const wk = wu / atkDur; const anti = U.smooth(U.clamp(k / wk, 0, 1)), lunge = U.smooth(U.clamp((k - wk) / 0.5, 0, 1)); r.body.position.y = 0.62 - 0.22 * anti + 0.3 * lunge; set(r.body, 0.35 * anti - 0.55 * lunge, 0, 0); set(r.neck, -0.4 * anti + 0.6 * lunge, 0, 0); r.legs.forEach((lg) => { if (lg.front) { set(lg.hp, -0.8 * anti + 1.6 * lunge, 0, 0); set(lg.kn, 0.9 * anti - 0.3 * lunge, 0, 0); } }); }
+  else if (h.state === 'stagger') { const f = s(U.clamp(h.st / 0.35, 0, 1) * Math.PI); set(r.body, -0.25 * f, 0.35 * f, 0.3 * f); }
+  else if (h.state === 'dead') { const k = U.clamp(h.st / 0.7, 0, 1); set(r.body, 0, 0, k * Math.PI * 0.52); r.body.position.y = U.lerp(0.62, 0.3, k); r.legs.forEach((lg, i) => set(lg.hp, 0.4 + i * 0.15, 0, 0)); }
+  else if (h.state === 'sink') { const k = U.clamp(h.st / 2.2, 0, 1); r.body.position.y = 0.62 - k * 1.4; set(r.neck, -0.6, 0, 0); }
+  r.eye.visible = ['chase', 'attack', 'frenzy', 'charge'].includes(h.state);
+  const flash = (h.state === 'attack' && h.st < wu) ? (0.35 + 0.65 * Math.abs(s(gt * 28))) * (h.st / wu) : h.flashT > 0 ? h.flashT * 3 : 0;
+  r.mat.emissive.setRGB(flash * 0.9, flash * 0.12, flash * 0.05);
+}
 function poseHunter(r, h, gt) {
   if (r.custom === 'croc') return poseCroc(r, h, gt);
   if (r.custom === 'snake') return poseSnake(r, h, gt);
+  if (r.custom === 'beast') return poseBeast(r, h, gt);
   const set = (o, x, y, z) => o.rotation.set(x, y, z); const s = Math.sin;
   const moving = h.state === 'chase' || h.state === 'investigate' || h.state === 'patrol' || h.state === 'charge' || h.state === 'reposition' || h.state === 'frenzy'; const ph = h.ph;
   r.body.position.y = 1.0 + (moving ? Math.abs(s(ph)) * 0.06 : s(gt * 2) * 0.02); set(r.body, 0, 0, 0);
@@ -293,7 +349,25 @@ function poseHunter(r, h, gt) {
 // ---------------- particles ----------------
 const PARTS = (() => { const N = 400; const geo = new THREE.BoxGeometry(0.09, 0.09, 0.09); const mat = new THREE.MeshBasicMaterial({ color: 0xffffff }); const im = new THREE.InstancedMesh(geo, mat, N); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; scene.add(im); const P = []; for (let i = 0; i < N; i++) P.push({ life: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, s: 1, c: new THREE.Color() }); im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3); let head = 0; const d = new THREE.Object3D();
   return { spawn(x, y, z, n, col, spd = 4, up = 3, size = 1, life = 0.7) { for (let i = 0; i < n; i++) { const p = P[head]; head = (head + 1) % N; p.life = life * (0.6 + Math.random() * 0.6); p.maxLife = p.life; p.x = x; p.y = y; p.z = z; const a = Math.random() * 6.28, r = Math.random() * spd; p.vx = Math.cos(a) * r; p.vz = Math.sin(a) * r; p.vy = Math.random() * up; p.s = size * (0.5 + Math.random()); p.c.set(col).multiplyScalar(0.6 + Math.random() * 0.8); } },
-    update(dt) { for (let i = 0; i < N; i++) { const p = P[i]; if (p.life <= 0) { d.scale.setScalar(0); d.position.set(0, -50, 0); } else { p.life -= dt; p.vy -= 12 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; const g = terrainH(p.x, p.z); if (p.y < g) { p.y = g; p.vy *= -0.3; p.vx *= 0.6; p.vz *= 0.6; } d.position.set(p.x, p.y, p.z); d.scale.setScalar(p.s * Math.min(1, p.life / p.maxLife * 2)); d.rotation.set(p.life * 5, p.life * 3, 0); im.setColorAt(i, p.c); } d.updateMatrix(); im.setMatrixAt(i, d.matrix); } im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; } }; })();
+    jet(x, y, z, dx, dz, n, col, spd = 6, size = 1, life = 0.7) { const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl; for (let i = 0; i < n; i++) { const p = P[head]; head = (head + 1) % N; p.life = life * (0.5 + Math.random() * 0.7); p.maxLife = p.life; p.x = x; p.y = y; p.z = z; const sp2 = spd * (0.4 + Math.random()); const a = (Math.random() - 0.5) * 0.9; const ca = Math.cos(a), sa = Math.sin(a); p.vx = (dx * ca - dz * sa) * sp2; p.vz = (dx * sa + dz * ca) * sp2; p.vy = 1 + Math.random() * 3.5; p.s = size * (0.4 + Math.random()); p.c.set(col).multiplyScalar(0.5 + Math.random() * 0.6); } },
+    update(dt) { for (let i = 0; i < N; i++) { const p = P[i]; if (p.life <= 0) { d.scale.setScalar(0); d.position.set(0, -50, 0); } else { p.life -= dt; p.vy -= 12 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; const g = terrainH(p.x, p.z); if (p.y < g) { p.y = g; p.vy *= -0.3; p.vx *= 0.6; p.vz *= 0.6; if (p.blood && p.s > 0.7) { BLOOD.spawn(p.x, p.z, 0.25 + Math.random() * 0.3, false); p.blood = false; } } d.position.set(p.x, p.y, p.z); d.scale.setScalar(p.s * Math.min(1, p.life / p.maxLife * 2)); d.rotation.set(p.life * 5, p.life * 3, 0); im.setColorAt(i, p.c); } d.updateMatrix(); im.setMatrixAt(i, d.matrix); } im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; },
+    markBlood(n) { for (let i = 0; i < n; i++) P[(head - 1 - i + N) % N].blood = true; } }; })();
+
+// ---------------- blood decals (splats & pools) ----------------
+const BLOOD = (() => {
+  const N = 140;
+  const tex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const r = U.rng(77); for (let i = 0; i < 22; i++) { const a = r() * 6.28, d = r() * r() * 52; const px = 64 + Math.cos(a) * d, py = 64 + Math.sin(a) * d; const g = x.createRadialGradient(px, py, 1, px, py, 6 + r() * 22); g.addColorStop(0, 'rgba(70,6,4,0.95)'); g.addColorStop(0.7, 'rgba(90,10,6,0.55)'); g.addColorStop(1, 'rgba(90,10,6,0)'); x.fillStyle = g; x.beginPath(); x.arc(px, py, 6 + r() * 22, 0, 6.28); x.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.9 });
+  const im = new THREE.InstancedMesh(geo, mat, N); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.renderOrder = 1; scene.add(im);
+  const P = []; for (let i = 0; i < N; i++) P.push({ on: 0 });
+  let head = 0; const d = new THREE.Object3D();
+  return {
+    spawn(x, z, s, pool) { const p = P[head]; head = (head + 1) % N; p.on = 1; p.x = x; p.z = z; p.s = s * (0.8 + Math.random() * 0.6); p.grow = pool ? s * 1.6 : p.s; p.rot = Math.random() * 6.28; p.age = 0; p.max = pool ? 45 : 25; },
+    clear() { for (const p of P) p.on = 0; },
+    update(dt) { for (let i = 0; i < N; i++) { const p = P[i]; if (!p.on) { d.scale.setScalar(0); d.position.set(0, -60, 0); } else { p.age += dt; if (p.s < p.grow) p.s = Math.min(p.grow, p.s + dt * 0.9); const fade = p.age > p.max - 6 ? Math.max(0, (p.max - p.age) / 6) : 1; if (fade <= 0) { p.on = 0; continue; } let y = terrainH(p.x, p.z); if (W.waterY != null && y < W.waterY - 0.2) y = W.waterY; d.position.set(p.x, y + 0.045, p.z); d.rotation.set(0, p.rot, 0); d.scale.set(p.s * fade * 0.4 + p.s * 0.6, 1, p.s * fade * 0.4 + p.s * 0.6); } d.updateMatrix(); im.setMatrixAt(i, d.matrix); } im.instanceMatrix.needsUpdate = true; }
+  };
+})();
 
 // ---------------- game state ----------------
 const G = { started: false, complete: false, restarting: false, solo: false, readyMe: false, readyOther: false, t: 0, kills: 0, deaths: 0, lvlT: 0,
@@ -344,14 +418,17 @@ function blocked(x, z, r = 0.5) { for (const t of cols) { const d = Math.hypot(t
 function moveWithCollision(p, nx, nz) { const t = blocked(nx, nz); if (!t) { p.x = nx; p.z = nz; return; } const t2 = blocked(nx, p.z); if (!t2) { p.x = nx; return; } const t3 = blocked(p.x, nz); if (!t3) { p.z = nz; return; } }
 function addSound(x, z, r, kind, p) { G.sounds.push({ x, z, r, kind, p, life: 0.12 }); }
 let shake = 0;
-function juice(kind, x, y, z) {
-  if (kind === 'hit') { G.hitStop = Math.max(G.hitStop, 0.055); shake = Math.max(shake, 0.25); PARTS.spawn(x, y, z, 14, 0x8a1a12, 3.5, 3, 1, 0.6); PARTS.spawn(x, y, z, 5, 0xffb060, 5, 4, 0.6, 0.3); A.sfx('clatter', 0.5); }
-  else if (kind === 'heavy') { G.hitStop = Math.max(G.hitStop, 0.11); shake = Math.max(shake, 0.7); PARTS.spawn(x, y, z, 30, 0x8a1a12, 6, 5, 1.3, 0.8); PARTS.spawn(x, y, z, 12, 0xffb060, 7, 5, 0.7, 0.4); A.sfx('thud', 0.5); A.sfx('clatter', 0.5); }
-  else if (kind === 'kill') { G.slowmo = 0.45; G.fovT = 50; shake = Math.max(shake, 0.5); PARTS.spawn(x, y, z, 40, 0x7a1410, 5, 6, 1.4, 1.1); A.sfx('death', 0.5); }
+function juice(kind, x, y, z, dx, dz) {
+  const hasDir = dx != null;
+  if (kind === 'hit') { G.hitStop = Math.max(G.hitStop, 0.055); shake = Math.max(shake, 0.25); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 12, 0x6a0d08, 7, 0.9, 0.7); PARTS.markBlood(12); } PARTS.spawn(x, y, z, 10, 0x5a0a06, 3, 3, 0.9, 0.6); PARTS.markBlood(6); PARTS.spawn(x, y, z, 4, 0xffb060, 5, 4, 0.5, 0.25); BLOOD.spawn(x, z, 0.5, false); A.sfx('clatter', 0.5); }
+  else if (kind === 'heavy') { G.hitStop = Math.max(G.hitStop, 0.11); shake = Math.max(shake, 0.7); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 22, 0x6a0d08, 10, 1.2, 0.9); PARTS.markBlood(22); } PARTS.spawn(x, y, z, 20, 0x5a0a06, 5, 5, 1.2, 0.8); PARTS.markBlood(12); PARTS.spawn(x, y, z, 8, 0xffb060, 7, 5, 0.6, 0.3); BLOOD.spawn(x, z, 0.9, false); A.sfx('thud', 0.5); A.sfx('clatter', 0.5); }
+  else if (kind === 'kill') { G.slowmo = 0.45; G.fovT = 50; shake = Math.max(shake, 0.5); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 26, 0x5a0a06, 9, 1.3, 1.1); PARTS.markBlood(26); } PARTS.spawn(x, y, z, 30, 0x4a0806, 5, 6, 1.3, 1.1); PARTS.markBlood(18); BLOOD.spawn(x, z, 1.7, true); A.sfx('death', 0.5); }
   else if (kind === 'slam') { shake = Math.max(shake, 1.0); PARTS.spawn(x, terrainH(x, z) + 0.2, z, 40, 0x4a5a30, 8, 5, 1.2, 0.8); A.sfx('thud', 0.5); A.sfx('wave', 0.5); }
   else if (kind === 'hurt') { G.hitStop = Math.max(G.hitStop, 0.08); shake = Math.max(shake, 0.6); hurtFlash(); A.sfx('thud', 0.5); }
   else if (kind === 'rise') { PARTS.spawn(x, terrainH(x, z) + 0.3, z, 30, 0x3a4a28, 5, 6, 1.2, 0.9); A.sfx('growl', 0.5); shake = Math.max(shake, 0.3); }
-  else if (kind === 'stealth') { G.slowmo = 0.6; G.fovT = 48; PARTS.spawn(x, y, z, 30, 0x7a1410, 3, 4, 1.2, 1.0); A.sfx('rope', 0.5); A.sfx('death', 0.5); }
+  else if (kind === 'stealth') { G.slowmo = 0.6; G.fovT = 48; PARTS.spawn(x, y, z, 26, 0x4a0806, 3, 4, 1.1, 1.0); PARTS.markBlood(16); BLOOD.spawn(x, z, 1.4, true); A.sfx('rope', 0.5); A.sfx('death', 0.5); }
+  else if (kind === 'wardbreak') { G.hitStop = Math.max(G.hitStop, 0.09); shake = Math.max(shake, 0.8); PARTS.spawn(x, y, z, 44, 0xffd060, 8, 7, 1.1, 0.9); A.sfx('bell', 0.7); A.sfx('clatter', 0.4); }
+  else if (kind === 'wardhit') { PARTS.spawn(x, y, z, 8, 0xffd060, 3, 2.5, 0.6, 0.35); A.sfx('tick', 0.5); }
   else if (kind === 'splash') { PARTS.spawn(x, y, z, 22, 0x8ac8d8, 4, 5, 0.9, 0.7); A.sfx('splash', 0.5); }
   else if (kind === 'shot') { shake = Math.max(shake, 0.45); A.sfx('gun', 0.6); }
   else if (kind === 'vanish') { PARTS.spawn(x, y, z, 26, 0x8a5adf, 3, 4, 1.0, 0.8); A.sfx('whoosh', 0.5); }
@@ -363,13 +440,14 @@ function bc(k, data = {}) { Net.send(Object.assign({ t: 'ev', k }, data)); }
 // ---------------- enemies ----------------
 function instEnemy(type, x, z, state, yaw, arena, opts = {}) {
   const T_ = ETYPES[type]; const rig = makeHunter(type); scene.add(rig.g);
-  const h = { id: G.hunters.length, type, rig, x, z, ax: x, az: z, range: opts.range || 10, yaw: yaw == null ? rng() * 6.28 : yaw, state, st: 0, tx: x, tz: z, hp: T_.hp, maxHp: T_.hp, ph: Math.random() * 6, target: null, gx: null, gz: null, windup: T_.windup, dmg: T_.dmg, reach: T_.reach, speed: T_.speed, aoe: !!T_.aoe, poise: T_.poise || 0, boss: !!T_.boss, arena: arena == null ? -1 : arena, flashT: 0, nextCharge: 6, aggro: 0, opts, def: opts.def || null };
+  const h = { id: G.hunters.length, type, rig, x, z, ax: x, az: z, range: opts.range || 10, yaw: yaw == null ? rng() * 6.28 : yaw, state, st: 0, tx: x, tz: z, hp: T_.hp, maxHp: T_.hp, ph: Math.random() * 6, target: null, gx: null, gz: null, windup: T_.windup, dmg: T_.dmg, reach: T_.reach, speed: T_.speed, aoe: !!T_.aoe, poise: T_.poise || 0, boss: !!T_.boss, arena: arena == null ? -1 : arena, flashT: 0, nextCharge: 6, aggro: 0, opts, def: opts.def || null, ward: !!opts.ward, wardDown: 0, lastHitK: 0, lastHitS: 0, soloT: 0 };
+  if (h.ward) { const wm = new THREE.Mesh(new THREE.SphereGeometry(1.15, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffc860, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })); wm.position.y = 1.1; wm.scale.setScalar((T_.scale || 1) * 1.35); rig.g.add(wm); h.wardMesh = wm; }
   G.hunters.push(h); return h;
 }
 function spawnEnemies() {
   for (const h of G.hunters) scene.remove(h.rig.g); G.hunters = [];
   const arenas = LV.arenas || [];
-  arenas.forEach((a, ai) => { if (G.cleared[ai]) return; for (const s of a.spawn) instEnemy(s[0], s[1], s[2], 'hidden', null, ai); });
+  arenas.forEach((a, ai) => { if (G.cleared[ai]) return; for (const s of a.spawn) instEnemy(s[0], s[1], s[2], 'hidden', null, ai, s[3] || {}); });
   for (const d of EDEFS) { if (d.done) continue; if (d.afterCp != null && d.afterCp > G.checkpoint) continue; instEnemy(d.type, d.x, d.z, d.state || 'listen', d.yaw, -1, Object.assign({ def: d }, d.opts || {})); }
 }
 function nearestPlayer(h, players) { let best = null, bd = 1e9; for (const p of players) { const d = Math.hypot(p.x - h.x, p.z - h.z); if (d < bd) { bd = d; best = p; } } return best; }
@@ -488,8 +566,13 @@ function brainIllusion(h, dt, players) {
 regBrain('gunman', brainGunman); regBrain('captain', brainGunman); regBrain('croc', brainCroc); regBrain('aazhi', brainCroc); regBrain('snake', brainSnake); regBrain('cannibal', brainCannibal); regBrain('watcher', brainCannibal); regBrain('illusion', brainIllusion);
 function enemyUpdate(dt) {
   const players = [me, other].filter(p => p && !p.down && !p.dead && (p === me || p.tx != null));
+  const coopNow = !G.solo && other && other.tx != null;
   for (const h of G.hunters) {
     h.st += dt; h.flashT = Math.max(0, h.flashT - dt);
+    if (h.ward) {
+      h.wardDown = Math.max(0, h.wardDown - dt);
+      if (!coopNow && h.state !== 'dead' && h.state !== 'hidden') { h.soloT += dt; if (h.soloT > 8.5) { h.soloT = 0; h.wardDown = 3.4; const y2 = terrainH(h.x, h.z) + 1.2; juice('wardbreak', h.x, y2, h.z); banner(L('THE WARD GASPS OPEN', 'கவசம் மூச்சு விடுது'), L('Strike now!', 'இப்பவே அடி!'), 1.6); } }
+    }
     if (h.state === 'dead') { if (h.st > 3) h.rig.g.visible = false; continue; }
     if (h.state === 'hidden') continue;
     if (h.state === 'sink') { if (h.st > 2.2) { h.state = 'dead'; h.st = 0; G.kills++; bc('juice', { j: 'splash', x: h.x, y: 0.5, z: h.z }); juice('splash', h.x, 0.5, h.z); } continue; }
@@ -501,15 +584,31 @@ function enemyUpdate(dt) {
 function damageHunter(h, dmg, from, kind = 'hit') {
   if (h.state === 'dead' || h.state === 'hidden' || h.state === 'sink') return;
   const T_ = ETYPES[h.type]; if (T_.exposedOnly && h.state === 'lurk') return; // can't hit a lurking croc
-  h.hp -= dmg; const y = terrainH(h.x, h.z) + 1.2 * (T_.scale || 1);
-  const src = from.__real || from; h.flashT = 0.12;
+  const src = from.__real || from;
+  const ddx = h.x - from.x, ddz = h.z - from.z;
+  const y = terrainH(h.x, h.z) + 1.2 * (T_.scale || 1);
+  // Twin Strike ward: full damage only while the ward is down
+  if (h.ward && h.wardDown <= 0) {
+    const t = G.t; if (src.who === 'K') h.lastHitK = t; else if (src.who === 'S') h.lastHitS = t;
+    const coop = !G.solo && other && other.tx != null;
+    if (coop && h.lastHitK && h.lastHitS && Math.abs(h.lastHitK - h.lastHitS) < 1.25) {
+      h.wardDown = 6.5; h.lastHitK = h.lastHitS = 0;
+      juice('wardbreak', h.x, y, h.z); bc('juice', { j: 'wardbreak', x: h.x, y, z: h.z });
+      banner(L('TWIN STRIKE — THE WARD SHATTERS', 'இரட்டை வெட்டு — கவசம் உடைந்தது'), L('Six breaths of open flesh', 'ஆறு மூச்சுக்கு அது வெறும் சதை'), 2.2);
+      Net.send({ t: 'ev', k: 'twin' });
+    } else {
+      dmg = Math.min(dmg, 1); h.flashT = 0.12;
+      juice('wardhit', h.x, y, h.z); bc('juice', { j: 'wardhit', x: h.x, y, z: h.z });
+    }
+  }
+  h.hp -= dmg; h.flashT = 0.12;
   if (h.hp <= 0) {
     h.state = 'dead'; h.st = 0; G.kills++; if (h.def && h.def.once) h.def.done = true;
-    juice(T_.vanish ? 'vanish' : 'kill', h.x, y, h.z); bc('juice', { j: T_.vanish ? 'vanish' : 'kill', x: h.x, y, z: h.z });
+    juice(T_.vanish ? 'vanish' : 'kill', h.x, y, h.z, ddx, ddz); bc('juice', { j: T_.vanish ? 'vanish' : 'kill', x: h.x, y, z: h.z, dx: ddx, dz: ddz });
     if (h.boss) setTimeout(() => A.horn(52, 5, 0.5), 400);
     if (T_.onDeath) T_.onDeath(CTX, h);
   } else {
-    juice(kind === 'heavy' ? 'heavy' : 'hit', h.x, y, h.z); bc('juice', { j: kind === 'heavy' ? 'heavy' : 'hit', x: h.x, y, z: h.z });
+    juice(kind === 'heavy' ? 'heavy' : 'hit', h.x, y, h.z, ddx, ddz); bc('juice', { j: kind === 'heavy' ? 'heavy' : 'hit', x: h.x, y, z: h.z, dx: ddx, dz: ddz });
     const heavy = kind === 'heavy';
     if (h.poise === 0 || heavy || (h.poise <= 2 && h.hp < h.maxHp * 0.3)) { h.state = 'stagger'; h.st = 0; }
     h.target = src; h.tx = src.x; h.tz = src.z;
@@ -656,6 +755,7 @@ function loadLevel(i) {
   if (G.started) { if (LV.amb) A.ambience(LV.amb); const dr = LV.drums || ['heart', 64, 0.35]; A.drumsSet(dr[0], dr[1], dr[2]); }
 }
 function unloadLevel() {
+  BLOOD.clear();
   if (!LG) return; scene.remove(LG);
   LG.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && !(o.material.userData && o.material.userData.shared)) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
   LG = null;
@@ -702,11 +802,12 @@ function syncRoster(list) { for (const h of G.hunters) scene.remove(h.rig.g); G.
 function onMessage(m) {
   if (m.t === 'av') applyRemote(other, m);
   else if (m.t === 'ready') { G.readyOther = true; tryStart(); }
-  else if (m.t === 'ws') { if (m.h.length !== G.hunters.length) syncRoster(m.h); m.h.forEach((v, i) => { const h = G.hunters[i]; if (!h) return; h.gx = v[0]; h.gz = v[1]; h.yaw = v[2]; if (h.state !== v[3]) { h.state = v[3]; h.st = 0; } h.hp = v[4]; h.aggro = v[7] || 0; if (h.gx != null && Math.hypot(h.gx - h.x, h.gz - h.z) > 6) { h.x = h.gx; h.z = h.gz; } }); if (m.hp) { K().hp = m.hp[0]; S().hp = m.hp[1]; } G.kills = m.k; G.arena = m.a; G.arenaActive = !!m.aa; (m.cl || []).forEach((c, i) => { G.cleared[i] = !!c; }); G.checkpoint = m.cp; }
+  else if (m.t === 'ws') { if (m.h.length !== G.hunters.length) syncRoster(m.h); m.h.forEach((v, i) => { const h = G.hunters[i]; if (!h) return; h.gx = v[0]; h.gz = v[1]; h.yaw = v[2]; if (h.state !== v[3]) { h.state = v[3]; h.st = 0; } h.hp = v[4]; h.aggro = v[7] || 0; const w = v[8] || 0; if (w > 0 && !h.wardMesh) { const wm = new THREE.Mesh(new THREE.SphereGeometry(1.15, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffc860, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })); wm.position.y = 1.1; h.rig.g.add(wm); h.wardMesh = wm; h.ward = true; } h.wardDown = w === 2 ? 1 : 0; if (h.gx != null && Math.hypot(h.gx - h.x, h.gz - h.z) > 6) { h.x = h.gx; h.z = h.gz; } }); if (m.hp) { K().hp = m.hp[0]; S().hp = m.hp[1]; } G.kills = m.k; G.arena = m.a; G.arenaActive = !!m.aa; (m.cl || []).forEach((c, i) => { G.cleared[i] = !!c; }); G.checkpoint = m.cp; }
   else if (m.t === 'ev') {
     if (m.k === 'start') start();
     else if (m.k === 'cue') cue(m.id, m.dur); else if (m.k === 'say') say(m.sp, m.id, m.dur); else if (m.k === 'sfx') A.sfx(m.n, 0.5);
-    else if (m.k === 'juice') juice(m.j, m.x, m.y || terrainH(m.x, m.z) + 1, m.z);
+    else if (m.k === 'juice') juice(m.j, m.x, m.y || terrainH(m.x, m.z) + 1, m.z, m.dx, m.dz);
+    else if (m.k === 'twin') banner(L('TWIN STRIKE — THE WARD SHATTERS', 'இரட்டை வெட்டு — கவசம் உடைந்தது'), L('Six breaths of open flesh', 'ஆறு மூச்சுக்கு அது வெறும் சதை'), 2.2);
     else if (m.k === 'hurt') { const p = m.who === 'K' ? K() : S(); p.hp = m.hp; if (p === me) { p.hitT = 0.35; p.anim = 'hit'; p.at = 0; p.inv = 0.9; p.x = m.x; p.z = m.z; juice('hurt', p.x, 0, p.z); } }
     else if (m.k === 'down') { const p = m.who === 'K' ? K() : S(); p.down = true; p.hp = 0; p.anim = 'dead'; p.at = 0; if (p === me) banner(L('DOWN — your partner can revive you (hold E)', 'விழுந்துட்டீங்க — நண்பர் E பிடிச்சு எழுப்பலாம்'), '', 4); }
     else if (m.k === 'revived') { const p = m.who === 'K' ? K() : S(); p.down = false; p.dead = false; p.hp = 3; p.anim = 'idle'; p.at = 0; p.inv = 1.5; A.sfx('success', 0.5); }
@@ -744,6 +845,7 @@ function rules() {
   $('rules-title').textContent = `${L('TRIAL', 'சோதனை')} ${ROMAN[LVI]} — ${LV.name()}`;
   const ul = $('rules-lines'); ul.innerHTML = '';
   LV.rules(CTX).forEach(l => { const li = document.createElement('li'); li.textContent = l; ul.appendChild(li); });
+  { const li = document.createElement('li'); li.textContent = L('THE GOLDEN WARD: this trial\'s keeper is warded — it barely bleeds. TWIN STRIKE: both players hit it within a breath and the ward shatters for six. Alone, the ward only gasps open every few breaths. The gate stays sealed while the keeper lives.', 'தங்கக் கவசம்: இந்த சோதனையின் காவலனுக்கு கவசம் — அடி பட்டாலும் ரத்தம் வராது. இரட்டை வெட்டு: இருவரும் ஒரே மூச்சில் அடித்தால் கவசம் ஆறு மூச்சுக்கு உடையும். தனியாக இருந்தால் கவசம் அவ்வப்போது தான் திறக்கும். காவலன் உயிரோட இருக்கும் வரை வாசல் திறக்காது.'); li.style.color = '#f0c060'; ul.appendChild(li); }
   $('rules').classList.remove('hidden');
   $('rules-ok').onclick = () => { $('rules').classList.add('hidden'); A.ensure(); G.readyMe = true; Net.send({ t: 'ready' }); $('lobby-status').textContent = ''; tryStart(); if (!G.started) { $('hud').classList.remove('hidden'); hint(T('ready')); } };
 }
@@ -791,6 +893,8 @@ function hudUpdate(dt) {
   else if (st) obj = L('E — SILENT KILL', 'E — அமைதியான கொலை');
   else if (me.nearInter) obj = me.nearInter.label();
   if (me.down) obj = partner ? L('DOWN — wait for your partner', 'விழுந்துட்டீங்க — நண்பருக்காக இருங்க') : '';
+  if (obj == null) { const wd = G.hunters.find(h => h.ward && h.state !== 'dead' && h.state !== 'hidden' && Math.hypot(h.x - me.x, h.z - me.z) < 24); if (wd) obj = wd.wardDown > 0 ? L('THE WARD IS DOWN — CUT DEEP', 'கவசம் கீழ — ஆழமா வெட்டு') : (partner ? L('TWIN STRIKE — both of you hit it within a breath', 'இரட்டை வெட்டு — ரெண்டு பேரும் ஒரே மூச்சுல அடிங்க') : L('Alone, the ward only gasps open every few breaths — wait for it', 'தனியா கவசம் அவ்வப்போ தான் திறக்கும் — காத்திரு')); }
+  if (obj == null && G.gateZ != null && me.z < G.gateZ + 30) { const kAlive = EDEFS.some(d => d.gateKeeper && !d.done); if (kAlive) obj = L('THE GATE IS SEALED — its keeper still lives', 'வாசல் மூடியிருக்கு — காவலன் இன்னும் உயிரோட'); }
   if (obj == null && LV.objective) obj = LV.objective(CTX);
   if (LV.waypointFn) target = LV.waypointFn(CTX);
   hint(obj || '');
@@ -824,12 +928,12 @@ function frame(now) {
       enemyUpdate(dt); G.sounds = G.sounds.filter(s => (s.life -= dt) > 0); arenaUpdate(dt);
       if (LV.checkpoints && LV.autoCp !== false) { const lead = Math.min(me.z, other && other.tx != null ? other.z : me.z); const cps = LV.checkpoints; while (G.checkpoint < cps.length - 1) { const nx = cps[G.checkpoint + 1]; const nz = Array.isArray(nx) ? nx[1] : nx; if (lead < nz + 2) G.checkpoint++; else break; } }
       for (const p of [me, other]) { if (p && p.down) { p.downT -= dt; if (p.downT <= 0) restart(p.who); } }
-      if (G.gateZ != null) { const ps = [me]; if (other && other.tx != null && !G.solo) ps.push(other); if (ps.every(p => p.z < G.gateZ + 3)) levelComplete(); }
+      if (G.gateZ != null) { const keepersDead = EDEFS.every(d => !d.gateKeeper || d.done); if (keepersDead) { const ps = [me]; if (other && other.tx != null && !G.solo) ps.push(other); if (ps.every(p => p.z < G.gateZ + 3)) levelComplete(); } }
     }
     stonesUpdate(dt); if (other) remoteTick(other, dt); meeraUpdate(dt); runScript(dt);
     if (LV.update) LV.update(CTX, dt);
     G.netAcc += rdt; if (G.netAcc >= 0.05) { G.netAcc = 0; Net.send(pack(me)); }
-    if (Net.isHost) { G.wsAcc += rdt; if (G.wsAcc >= 0.066) { G.wsAcc = 0; Net.send({ t: 'ws', h: G.hunters.map(h => [+h.x.toFixed(2), +h.z.toFixed(2), +h.yaw.toFixed(2), h.state, h.hp, h.type, h.arena, +(h.aggro || 0).toFixed(2)]), hp: [K().hp, S().hp], k: G.kills, a: G.arena, aa: G.arenaActive ? 1 : 0, cl: (LV.arenas || []).map((a, i) => G.cleared[i] ? 1 : 0), cp: G.checkpoint }); } }
+    if (Net.isHost) { G.wsAcc += rdt; if (G.wsAcc >= 0.066) { G.wsAcc = 0; Net.send({ t: 'ws', h: G.hunters.map(h => [+h.x.toFixed(2), +h.z.toFixed(2), +h.yaw.toFixed(2), h.state, h.hp, h.type, h.arena, +(h.aggro || 0).toFixed(2), h.ward ? (h.wardDown > 0 ? 2 : 1) : 0]), hp: [K().hp, S().hp], k: G.kills, a: G.arena, aa: G.arenaActive ? 1 : 0, cl: (LV.arenas || []).map((a, i) => G.cleared[i] ? 1 : 0), cp: G.checkpoint }); } }
     else if (!G.solo) { for (const h of G.hunters) { if (h.gx != null) { h.x += (h.gx - h.x) * Math.min(1, dt * 12); h.z += (h.gz - h.z) * Math.min(1, dt * 12); } h.st += dt; h.flashT = Math.max(0, (h.flashT || 0) - dt); if (h.state === 'dead' && h.st > 3) h.rig.g.visible = false; if (h.state === 'chase' || h.state === 'investigate' || h.state === 'patrol' || h.state === 'charge' || h.state === 'frenzy' || h.state === 'surge' || h.state === 'reposition') h.ph += dt * (h.state === 'chase' || h.state === 'frenzy' ? 12 : h.state === 'charge' ? 14 : 7); } }
   } else if (me) me.at += dt;
   softWalls.forEach((w, i) => { const want = G.cleared[i] ? 1 : 0; if (w.open !== want) w.open = U.clamp(w.open + (want ? dt * 0.5 : -dt), 0, 1); w.grp.position.y = -4.5 * U.smooth(w.open); w.grp.visible = w.open < 1; });
@@ -840,9 +944,10 @@ function frame(now) {
     if (W.waterY != null && y < W.waterY - 0.45) y = Math.max(y, W.waterY - 1.02);
     p.rig.g.position.set(p.x, y - (p.sink || 0) * 1.15, p.z); p.rig.g.rotation.y = p.yaw;
     poseRig(p.rig, { anim: p.anim, t: p.at, phase: p.phase, combo: p.combo, globalT: G.t + (p.who === 'S' ? 1.3 : 0), torch: p.torch });
+    if (p.rig.mark) p.rig.mark.material.opacity = p.rageOn > 0 ? 0.85 + Math.sin(G.t * 9) * 0.15 : 0.5 + Math.sin(G.t * 1.6) * 0.08;
   }
-  for (const h of G.hunters) { if (!h.rig.g.visible) continue; let hy = terrainH(h.x, h.z); if (ETYPES[h.type].rig === 'croc' && inWater(h.x, h.z)) hy = Math.min(hy, W.waterY - 0.5); if (h.state === 'sink') hy -= Math.min(1, h.st / 2.2) * 1.6; h.rig.g.position.set(h.x, hy, h.z); h.rig.g.rotation.y = h.yaw; poseHunter(h.rig, h, G.t + h.id); }
-  PARTS.update(dt);
+  for (const h of G.hunters) { if (!h.rig.g.visible) continue; let hy = terrainH(h.x, h.z); if (ETYPES[h.type].rig === 'croc' && inWater(h.x, h.z)) hy = Math.min(hy, W.waterY - 0.5); if (h.state === 'sink') hy -= Math.min(1, h.st / 2.2) * 1.6; h.rig.g.position.set(h.x, hy, h.z); h.rig.g.rotation.y = h.yaw; poseHunter(h.rig, h, G.t + h.id); if (h.wardMesh) { const up = h.wardDown <= 0 && h.state !== 'dead'; h.wardMesh.visible = up; if (up) { h.wardMesh.material.opacity = 0.12 + 0.08 * Math.abs(Math.sin(G.t * 3 + h.id)); h.wardMesh.scale.setScalar((ETYPES[h.type].scale || 1) * (1.3 + Math.sin(G.t * 2.2 + h.id) * 0.06)); } } }
+  PARTS.update(dt); BLOOD.update(dt);
   const k = K(); if (k && LV.heroLight !== false) { const ky = terrainH(k.x, k.z); torchL.position.set(k.x + Math.sin(k.yaw + 0.5) * 0.5, ky + 1.6, k.z + Math.cos(k.yaw + 0.5) * 0.5); torchL.intensity = (k.rig.g.visible ? 1 : 0) * (3.2 + Math.sin(G.t * 17) * 0.35 + Math.sin(G.t * 31) * 0.2) * (me.rageOn > 0 ? 1.6 : 1); torchL.color.setHex(me.rageOn > 0 ? 0xff6a30 : 0xffa040); } else torchL.intensity = 0;
   if (me.torch) { torchL2.position.set(me.x - Math.sin(me.yaw) * 0.3, terrainH(me.x, me.z) + 2.1, me.z - Math.cos(me.yaw) * 0.3); torchL2.intensity = 2.6 + Math.sin(G.t * 21) * 0.5; } else torchL2.intensity = 0;
   moon.position.set(me.x - 30, 60, me.z - 20); moon.target.position.set(me.x, 0, me.z); moon.target.updateMatrixWorld();

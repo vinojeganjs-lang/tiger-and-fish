@@ -110,6 +110,32 @@ function palmTree(c, x, z) {
   for (let i = 0; i < 7; i++) { const leaf = new T.Mesh(new T.PlaneGeometry(0.7, 3.2, 1, 4), lm); const pos = leaf.geometry.attributes.position; for (let v = 0; v < pos.count; v++) { const yy = pos.getY(v); pos.setZ(v, -Math.pow(yy + 1.6, 2) * 0.12); } leaf.geometry.computeVertexNormals(); const a = i / 7 * 6.28; leaf.position.set(0, 0.2, 0); leaf.rotation.set(-0.9, a, 0); const hold = new T.Group(); hold.rotation.y = a; hold.add(leaf); leaf.position.z = 1.4; top.add(hold); leaf.castShadow = true; }
   c.add(g); c.addCol(x, z, 0.5); return g;
 }
+function skyDisc(c, color, size, ox, oy, oz) {
+  const T = c.THREE;
+  const m = new T.Mesh(new T.SphereGeometry(size, 26, 20), new T.MeshBasicMaterial({ color, fog: false, transparent: true, opacity: 0.92 }));
+  const halo = new T.Mesh(new T.SphereGeometry(size * 1.18, 26, 20), new T.MeshBasicMaterial({ color, fog: false, transparent: true, opacity: 0.16, side: T.BackSide }));
+  m.add(halo); c.add(m);
+  c.anim((dt, t) => { const p = c.me(); if (!p) return; m.position.set(p.x + ox, oy, p.z + oz); });
+  return m;
+}
+function rockSpire(c, x, z, h, color) {
+  const T = c.THREE; const y = c.terrainH(x, z); const g = new T.Group(); g.position.set(x, y, z); g.rotation.y = c.rng()() * 6.28;
+  const m = new T.MeshStandardMaterial({ color: color || 0x8a6a42, roughness: 0.95, flatShading: true });
+  let py = 0, r = h * 0.09;
+  for (let i = 0; i < 4; i++) { const seg = new T.Mesh(new T.CylinderGeometry(r * (0.55 + Math.random() * 0.15), r, h * 0.28, 7), m); seg.position.y = py + h * 0.14; seg.rotation.y = Math.random(); seg.castShadow = true; g.add(seg); py += h * 0.26; r *= 0.72; }
+  const tip = new T.Mesh(new T.ConeGeometry(r, h * 0.2, 6), m); tip.position.y = py + h * 0.1; tip.castShadow = true; g.add(tip);
+  c.add(g); c.addCol(x, z, h * 0.1); return g;
+}
+function warBanner(c, x, z, color) {
+  const T = c.THREE; const y = c.terrainH(x, z); const g = new T.Group(); g.position.set(x, y, z);
+  const pole = new T.Mesh(new T.CylinderGeometry(0.05, 0.07, 4.4, 6), new T.MeshStandardMaterial({ color: 0x2a2018, roughness: 1 })); pole.position.y = 2.2; pole.castShadow = true; g.add(pole);
+  const arm = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 1.1, 5), new T.MeshStandardMaterial({ color: 0x2a2018, roughness: 1 })); arm.rotation.z = Math.PI / 2; arm.position.set(0.45, 4.1, 0); g.add(arm);
+  const cloth = new T.Mesh(new T.PlaneGeometry(0.85, 2.2, 1, 5), new T.MeshStandardMaterial({ color: color || 0xc05020, roughness: 0.9, side: T.DoubleSide }));
+  cloth.position.set(0.5, 2.95, 0); g.add(cloth);
+  const pos = cloth.geometry.attributes.position;
+  c.anim((dt, t) => { for (let i = 0; i < pos.count; i++) { const yy = pos.getY(i); pos.setZ(i, Math.sin(t * 2.2 + yy * 2.5 + x) * 0.12 * (1 - (yy + 1.1) / 2.2)); } pos.needsUpdate = true; });
+  c.add(g); c.addCol(x, z, 0.3); return g;
+}
 function brazierObj(c, x, z, litAtStart) {
   const T = c.THREE; const y = c.terrainH(x, z); const g = new T.Group(); g.position.set(x, y, z);
   const pole = new T.Mesh(new T.CylinderGeometry(0.09, 0.12, 1.5, 6), new T.MeshStandardMaterial({ color: 0x2a2420, roughness: 1 })); pole.position.y = 0.75; g.add(pole);
@@ -165,15 +191,16 @@ const T1 = {
     groundMist(c, 30, 'rgba(150,180,190,0.13)', 0.5);
     c.gate(-404, { seal: 0xffb040 });
     // enemies
-    c.etype('ghoul', { hp: 2, speed: 6.2, scale: 0.72, windup: 0.3, dmg: 1, reach: 1.8, color: 0x35402e, poise: 0 });
-    c.etype('croc', { hp: 7, speed: 8.5, scale: 1.1, windup: 0.5, dmg: 2, reach: 2.6, color: 0x2a3a28, poise: 1, rig: 'croc', exposedOnly: true, noStealth: true });
-    c.etype('aazhi', { hp: 20, speed: 8.5, scale: 1.7, windup: 0.55, dmg: 2, reach: 3.4, color: 0x24301e, poise: 2, rig: 'croc', exposedOnly: true, noStealth: true, boss: true });
+    skyDisc(c, 0xd8e8f0, 34, -160, 120, -420);
+    c.etype('ghoul', { hp: 3, speed: 6.4, scale: 0.72, windup: 0.28, dmg: 1, reach: 1.8, color: 0x35402e, poise: 0 });
+    c.etype('croc', { hp: 9, speed: 8.5, scale: 1.1, windup: 0.5, dmg: 2, reach: 2.6, color: 0x2a3a28, poise: 1, rig: 'croc', exposedOnly: true, noStealth: true });
+    c.etype('aazhi', { hp: 30, speed: 8.5, scale: 1.7, windup: 0.5, dmg: 2, reach: 3.4, color: 0x24301e, poise: 2, rig: 'croc', exposedOnly: true, noStealth: true, boss: true });
     c.enemy('ghoul', -5, -30, { state: 'listen', opts: { wander: true } }); c.enemy('ghoul', 8, -44, { state: 'listen', opts: { wander: true } }); c.enemy('ghoul', -10, -52, { state: 'listen', opts: { wander: true } });
     c.enemy('croc', -14, -95, { state: 'lurk' }); c.enemy('croc', 14, -88, { state: 'lurk' });
     c.enemy('croc', -10, -168, { state: 'lurk' }); c.enemy('croc', 14, -182, { state: 'lurk' });
     c.enemy('ghoul', 2, -215, { state: 'listen', afterCp: 0, opts: { wander: true } }); c.enemy('ghoul', -8, -222, { state: 'listen', opts: { wander: true } });
     c.enemy('croc', -16, -252, { state: 'lurk' }); c.enemy('croc', 6, -268, { state: 'lurk' }); c.enemy('croc', 16, -240, { state: 'lurk' });
-    c.enemy('aazhi', 0, -342, { state: 'lurk', opts: { senseR: 22, leash: 40 } });
+    c.enemy('aazhi', 0, -342, { state: 'lurk', once: true, gateKeeper: true, opts: { senseR: 22, leash: 44, ward: true } });
     c.enemy('ghoul', -4, -388, { state: 'listen', opts: { wander: true } }); c.enemy('ghoul', 7, -394, { state: 'listen', opts: { wander: true } });
   },
   rules(c) { const l = c.L; return [
@@ -221,11 +248,11 @@ const T2 = {
     for (const [x, z] of [[-18, -50], [18, -90], [-19, -130], [18, -170], [-18, -210], [18, -250], [-18, -290], [6, -318]]) totem(c, x, z, 0xff4020);
     bones(c, 3, -86, 1.1); bones(c, -7, -170, 1.3); bones(c, 5, -262, 1.2);
     c.gate(-344, { seal: 0xc94a3a });
-    c.etype('cannibal', { hp: 8, speed: 7.4, scale: 1.05, windup: 0.38, dmg: 2, reach: 2.2, color: 0x2c1c12, poise: 1, mask: 0xd8c8a0, noEars: true });
-    c.etype('watcher', { hp: 16, speed: 7.8, scale: 1.35, windup: 0.42, dmg: 2, reach: 2.6, color: 0x1c1210, poise: 2, mask: 0xa03020, noEars: true, boss: true });
+    c.etype('cannibal', { hp: 10, speed: 7.6, scale: 1.05, windup: 0.36, dmg: 2, reach: 2.2, color: 0x2c1c12, poise: 1, mask: 0xd8c8a0, noEars: true });
+    c.etype('watcher', { hp: 24, speed: 8.0, scale: 1.35, windup: 0.4, dmg: 2, reach: 2.6, color: 0x1c1210, poise: 2, mask: 0xa03020, noEars: true, boss: true });
     const spots = [[-8, -58, 0.4], [10, -80, -2.4], [-3, -102, 0.1], [13, -114, 2.0], [-13, -136, 0.8], [6, -150, -2.8], [-6, -168, 0.3], [12, -192, 2.6], [-11, -212, -0.5], [3, -228, 0.2], [-14, -252, 1.2], [8, -270, -2.2], [-4, -288, 0.4], [12, -308, 2.8], [-9, -320, -0.3]];
     for (const [x, z, yaw] of spots) c.enemy('cannibal', x, z, { state: 'still', yaw, opts: { deaf: true, seeR: 19, aggroRate: 0.8, calmR: 26 } });
-    c.enemy('watcher', 0, -334, { state: 'still', yaw: 0.05, opts: { deaf: true, seeR: 24, aggroRate: 1.15, calmR: 34 } });
+    c.enemy('watcher', 0, -334, { state: 'still', yaw: 0.05, once: true, gateKeeper: true, opts: { deaf: true, seeR: 24, aggroRate: 1.15, calmR: 40, ward: true } });
   },
   onStart(c) { ST[1].m = c.meter(c.L('SEEN', 'பார்த்துட்டாங்க'), '#e05040'); },
   onReset(c) { if (ST[1].m) ST[1].m(0, false); },
@@ -266,9 +293,11 @@ const T3 = {
       { z: -48, r: 15, spawn: [['stalker', -4, -46], ['stalker', 5, -52]], wall: -66, cp: 0, banner: cc => cc.banner(cc.L('AMBUSH — 2 hunters', 'திடீர் தாக்குதல் — 2'), cc.L('J attack · K heavy · Space dodge', 'J தாக்கு · K கனமா · Space dodge'), 2.6) },
       { z: -150, r: 18, spawn: [['hunter', -6, -146], ['hunter', 7, -152], ['stalker', 0, -160], ['stalker', -9, -157]], wall: -172, cp: 1, banner: cc => cc.banner(cc.L('AMBUSH — 4 hunters', 'திடீர் தாக்குதல் — 4'), '', 2.4) },
       { z: -290, r: 20, spawn: [['brute', 0, -296], ['hunter', -8, -286], ['hunter', 9, -288], ['stalker', -5, -302], ['stalker', 6, -303]], wall: -314, cp: 2, banner: cc => cc.banner(cc.L('AMBUSH — a big one leads them', 'திடீர் தாக்குதல் — பெரிசு ஒண்ணு வருது'), cc.L('Heavy attacks break it', 'கன அடிதான் அதை உடைக்கும்'), 2.8) },
-      { z: -470, r: 24, spawn: [['elder', 0, -480]], wall: -505, cp: 3, boss: true, banner: cc => { cc.banner(cc.L('THE ELDER HUNTER', 'மூத்த வேட்டைக்காரன்'), cc.L('It has heard every scream in this forest', 'இந்தக் காட்டோட எல்லா அலறலையும் இது கேட்டிருக்கு'), 3.5); cc.audio().horn(46, 4, 0.5); } },
+      { z: -470, r: 24, spawn: [['elder', 0, -480, { ward: true }]], wall: -505, cp: 3, boss: true, banner: cc => { cc.banner(cc.L('THE ELDER HUNTER', 'மூத்த வேட்டைக்காரன்'), cc.L('It has heard every scream in this forest', 'இந்தக் காட்டோட எல்லா அலறலையும் இது கேட்டிருக்கு'), 3.5); cc.audio().horn(46, 4, 0.5); } },
     ];
-    c.etype('elder', { hp: 42, speed: 4.6, scale: 2.1, windup: 0.75, dmg: 2, reach: 4.2, color: 0x241410, poise: 3, aoe: true, boss: true,
+    if (!c.G.solo) { ARENAS[1].spawn.push(['stalker', 3, -158]); ARENAS[2].spawn.push(['stalker', -3, -300], ['hunter', 3, -290]); ARENAS[3].spawn.push(['stalker', -7, -474], ['stalker', 7, -474]); }
+    for (const [x, z] of [[-8, -30], [9, -66], [-9, -172], [10, -230], [-8, -314], [9, -440], [-6, -505]]) warBanner(c, x, z, 0xc05020);
+    c.etype('elder', { hp: 56, speed: 4.8, scale: 2.1, windup: 0.72, dmg: 2, reach: 4.2, color: 0x241410, poise: 3, aoe: true, boss: true,
       onHurt: (cc, h) => { if (h.hp < h.maxHp * 0.5 && !h.phase2) { h.phase2 = true; h.speed *= 1.25; h.windup *= 0.8; h.state = 'roar'; h.st = 0; cc.sfx('growl', 0.5); cc.bc('sfx', { n: 'growl' }); cc.say('MEERA', () => cc.L('It is angry now! Stay behind it!', 'இப்போ கோபம் வந்துடுச்சு! பின்னாடியே இருங்க!'), 3.5); for (const s of [['stalker', -6, -472], ['stalker', 6, -472]]) { const nh = cc.spawnNow(s[0], s[1], s[2], 'rise'); nh.arena = 3; cc.juice('rise', s[1], 0, s[2]); } } } });
     // thorn walls
     { const geo = new T.ConeGeometry(0.5, 3.2, 5); const mat = new T.MeshStandardMaterial({ color: 0x0c1a10, roughness: 1, flatShading: true });
@@ -324,7 +353,7 @@ const T4 = {
     for (let i = 0; i < 60; i++) { const z = -r() * 380, x = (r() - 0.5) * W.half * 2.1; if (Math.abs(x) < 6 && z < -138 && z > -222) continue; deadTree(c, x, z, 0.7 + r() * 0.8); }
     scatterFerns(c, 800, 0x7a9a5a, [30, 80, 20], [35, 90, 25]); scatterRocks(c, 110, 0x2c3626); groundMist(c, 55, 'rgba(140,170,110,0.16)', 0.4); fireflies(c, 160, 0xa8ff50);
     c.gate(-386, { seal: 0xffb040 });
-    c.etype('snake', { hp: 2, speed: 2.4, scale: 1.0, windup: 0.55, dmg: 1, reach: 2.5, color: 0x3a5a20, poise: 0, rig: 'snake', noStealth: true });
+    c.etype('snake', { hp: 3, speed: 2.4, scale: 1.0, windup: 0.5, dmg: 1, reach: 2.5, color: 0x3a5a20, poise: 0, rig: 'snake', noStealth: true });
     // nests: mound + snakes ringed around it
     const T = c.THREE; const nests = [[-8, -52], [10, -72], [-4, -100], [12, -122], [-12, -156], [12, -170], [-12, -200], [10, -214], [-6, -248], [12, -268], [-10, -292], [4, -318], [-4, -344]];
     const mm = new T.MeshStandardMaterial({ color: 0x3a3020, roughness: 1, flatShading: true });
@@ -339,6 +368,7 @@ const T4 = {
     // warrior ambush mid-way
     c.enemy('stalker', -6, -238, { state: 'listen', yaw: 0.3, opts: { wander: true } }); c.enemy('stalker', 8, -252, { state: 'listen', yaw: -2.5, opts: { wander: true } });
     c.enemy('hunter', -4, -352, { state: 'listen', yaw: 0.2 }); c.enemy('hunter', 8, -360, { state: 'listen', yaw: 2.9 });
+    c.enemy('brute', 0, -380, { state: 'listen', yaw: 0.1, once: true, gateKeeper: true, opts: { ward: true } });
     // shrine at the end
     const sh = new T.Group(); const sy = c.terrainH(0, -372); sh.position.set(0, sy, -372);
     const slab = new T.Mesh(new T.BoxGeometry(3, 0.5, 2), new T.MeshStandardMaterial({ color: 0x4a443c, roughness: 0.9 })); slab.position.y = 0.25; sh.add(slab);
@@ -394,7 +424,9 @@ const T5 = {
     scatterRocks(c, 160, 0x6a5a40); groundMist(c, 20, 'rgba(220,190,140,0.1)', 0.8);
     bones(c, -10, -80, 2.2); bones(c, 16, -190, 1.6); bones(c, -20, -330, 2.6); bones(c, 4, -260, 1.2);
     c.gate(-424, { seal: 0xffb040 });
-    c.etype('jackal', { hp: 3, speed: 7.6, scale: 0.7, windup: 0.3, dmg: 1, reach: 1.9, color: 0x5a4526, poise: 0 });
+    skyDisc(c, 0xffd9a0, 46, 120, 95, -430);
+    for (const [x, z, h] of [[-34, -90, 26], [36, -150, 34], [-38, -230, 30], [34, -300, 38], [-30, -380, 28], [26, -60, 22]]) rockSpire(c, x, z, h);
+    c.etype('jackal', { hp: 4, speed: 7.8, scale: 0.85, windup: 0.28, dmg: 1, reach: 2.0, color: 0x6a5230, belly: 0x9a8258, poise: 0, rig: 'beast', noStealth: true });
     // fruit trees (green canopy = food)
     const T = c.THREE;
     const fruitSpots = [[-16, -60], [20, -130], [-24, -210], [8, -285], [-14, -368]];
@@ -423,6 +455,7 @@ const T5 = {
     c.enemy('jackal', -8, -110, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', -12, -116, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', -4, -120, { state: 'listen', opts: { wander: true } });
     c.enemy('jackal', 16, -220, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', 20, -226, { state: 'listen', opts: { wander: true } });
     c.enemy('jackal', -6, -350, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', -12, -356, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', 0, -360, { state: 'listen', opts: { wander: true } }); c.enemy('jackal', 6, -390, { state: 'listen', opts: { wander: true } });
+    c.enemy('brute', 0, -416, { state: 'listen', yaw: 0.1, once: true, gateKeeper: true, opts: { ward: true } });
   },
   onStart(c) { ST[4].m = c.meter(c.L('FOOD', 'உணவு'), '#8adf5a'); ST[4].drain = drainSelf(c, 'hunger', 5.5); },
   onReset(c) { const s = ST[4]; if (s.m) s.m(1, true); },
@@ -475,6 +508,7 @@ const T6 = {
     c.gate(-364, { seal: 0xffb040 });
     // half-sunk warrior statues as landmarks on the safe lane
     for (const z of [-70, -150, -230, -310]) { const lane = Math.sin(z * 0.045) * 14; ruinPillar(c, lane, z, 2.2 + r() * 1.4, true); }
+    c.enemy('brute', Math.sin(-352 * 0.045) * 14, -352, { state: 'listen', yaw: 0.1, once: true, gateKeeper: true, opts: { ward: true } });
   },
   onStart(c) { ST[5].m = c.meter(c.L('SINKING', 'மூழ்குது'), '#c9a15c'); ST[5].drain = drainSelf(c, 'sink', 2.6); },
   rules(c) { const l = c.L; return [
@@ -525,7 +559,7 @@ const T7 = {
     const W = c.W; W.half = 26; W.zMin = -420; W.zMax = 8;
     const nz = c.makeNoise(866);
     c.setTerrain((x, z) => { let h = nz.fbm2(x * 0.05 + 77, z * 0.05 + 77, 3) * 1.2 - 0.5; const edge = Math.max(0, (Math.abs(x) - W.half) / 9); h += edge * edge * 5; if (z < -310) h *= 0.25; return h; });
-    c.sky({ fog: 0x1a1626, fogD: 0.024, hemiSky: 0x5c5480, hemiGround: 0x141020, hemiI: 1.05, sun: 0xaaa0e0, sunI: 1.8, rim: 0x7a60b0, rimI: 0.7, exposure: 1.55, bloom: 0.75 });
+    c.sky({ fog: 0x101a26, fogD: 0.022, hemiSky: 0x4a6480, hemiGround: 0x0c1218, hemiI: 1.05, sun: 0x9ac0e0, sunI: 1.9, rim: 0x5a80b0, rimI: 0.8, exposure: 1.55, bloom: 0.8 });
     c.ground({ base: '#2a2830', spots: [70, 68, 80], dark: [18, 16, 24], colorFn: (x, z, col) => { const wet = nz.fbm2(x * 0.18, z * 0.18, 2); col.setRGB(0.42 + wet * 0.18, 0.4 + wet * 0.17, 0.48 + wet * 0.2); } });
     const r = c.rng();
     // ruined avenue: pillar rows + arches + rubble
@@ -550,8 +584,8 @@ const T7 = {
       const tail = new T.Mesh(new T.ConeGeometry(0.5, 0.8, 4), new T.MeshStandardMaterial({ color: 0xd8b040, roughness: 0.25, metalness: 0.9 })); tail.rotation.z = Math.PI / 2; tail.position.set(-1.2, 1.9, 0); g.add(tail);
       c.add(g); flamePoint(c, 0, y + 3.4, -400, 0xffd060, 26, 2.8); }
     c.etype('illusion', { hp: 1, speed: 8, scale: 0.95, windup: 0.34, dmg: 1, reach: 2.0, color: 0x241436, emissive: 0x6a30c0, poise: 0, vanish: true, noStealth: true });
-    c.etype('gunman', { hp: 4, speed: 5.2, scale: 1.0, windup: 1.15, dmg: 2, reach: 2.0, color: 0x30241a, poise: 1, gun: true, noStealth: true, mask: 0x181410 });
-    c.etype('captain', { hp: 22, speed: 5.6, scale: 1.25, windup: 0.95, dmg: 2, reach: 2.4, color: 0x3a2014, poise: 2, gun: true, noStealth: true, boss: true, mask: 0x801818, opts: {},
+    c.etype('gunman', { hp: 6, speed: 5.4, scale: 1.0, windup: 1.05, dmg: 2, reach: 2.0, color: 0x30241a, poise: 1, gun: true, noStealth: true, mask: 0x181410 });
+    c.etype('captain', { hp: 34, speed: 5.8, scale: 1.25, windup: 0.9, dmg: 2, reach: 2.4, color: 0x3a2014, poise: 2, gun: true, noStealth: true, boss: true, mask: 0x801818, opts: {},
       onDeath: (cc, h) => T7._ending(cc) });
   },
   onStart(c) { ST[6].m = c.meter(c.L('MADNESS', 'பைத்தியம்'), '#9a60e0'); },
@@ -587,6 +621,9 @@ const T7 = {
   waypointFn(c) { const s = ST[6]; if (s.phase >= 1) return null; const p = c.me(); if ((p.mad || 0) > 0.45) { let best = null, bd = 1e9; for (const b of s.braz) { if (b.lit) continue; const d = Math.hypot(b.x - p.x, b.z - p.z); if (d < bd) { bd = d; best = b; } } if (best) return [best.x, best.z, c.L('FIRE', 'தீ')]; } return [0, -340, c.L('PLAZA', 'மைதானம்')]; },
   update(c, dt) {
     const s = ST[6];
+    // storm lightning (local visual, both sides)
+    s.lit = (s.lit == null ? 4 : s.lit) - dt;
+    if (s.lit <= 0) { s.lit = 5 + Math.random() * 9; const el = document.getElementById('lit'); if (el) { el.style.opacity = 0.85; setTimeout(() => el.style.opacity = 0.25, 70); setTimeout(() => el.style.opacity = 0.6, 140); setTimeout(() => el.style.opacity = 0, 230); } c.shake(0.25); setTimeout(() => c.sfx('thud', 0.35), 500 + Math.random() * 900); }
     if (!c.isAuth()) return;
     // illusion pressure
     s.illT = (s.illT || 0) - dt;
@@ -598,7 +635,7 @@ const T7 = {
       for (const [x, z] of [[-7, -336], [5, -344], [12, -334]]) c.spawnNow('gunman', x, z, 'rise', { cd: 2.8 });
     } else if (s.phase === 1) {
       const alive = c.hunters().filter(h => (h.type === 'gunman' || h.type === 'captain') && h.state !== 'dead').length;
-      if (alive === 0) { s.phase = 2; c.bc('lvlev', { e: 'captain' }); T7._captain(c); c.spawnNow('captain', 0, -358, 'rise', { cd: 2.0 }); for (const [x, z] of [[-10, -350], [10, -352]]) c.spawnNow('gunman', x, z, 'rise', { cd: 3.0 }); }
+      if (alive === 0) { s.phase = 2; c.bc('lvlev', { e: 'captain' }); T7._captain(c); c.spawnNow('captain', 0, -358, 'rise', { cd: 2.0, ward: true }); for (const [x, z] of [[-10, -350], [10, -352]]) c.spawnNow('gunman', x, z, 'rise', { cd: 3.0 }); }
     }
   },
   onEvent(c, m) { if (m.e === 'guns') T7._guns(c); else if (m.e === 'captain') T7._captain(c); else if (m.e === 'ending') T7._endScript(c); },
