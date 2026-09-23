@@ -5,6 +5,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from './GLTFLoader.js';
+import { clone as skeletonClone } from './SkeletonUtils.js';
 import { LEVELS, INTERLUDES } from './levels.js';
 
 const $ = id => document.getElementById(id);
@@ -28,14 +30,14 @@ function makeNoise(seed) {
 
 // ---------------- renderer / scene ----------------
 const canvas = $('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouch ? 1.5 : 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.45;
 const scene = new THREE.Scene();
 const FOG = new THREE.Color(0x07130f);
 scene.background = FOG; scene.fog = new THREE.FogExp2(FOG, 0.03);
-const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 260);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 260);
 let fx = !qs.has('lowfx') && !isTouch; const LOWQ = qs.has('lowfx') || qs.has('lite'); if (LOWQ) renderer.shadowMap.enabled = false;
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -48,7 +50,7 @@ window.addEventListener('resize', resize); resize();
 const hemi = new THREE.HemisphereLight(0x4a7a72, 0x0a1408, 0.9); scene.add(hemi);
 const rim = new THREE.DirectionalLight(0x6a90a8, 0.6); rim.position.set(20, 30, 40); scene.add(rim);
 const moon = new THREE.DirectionalLight(0xa8c8d8, 1.7); moon.position.set(-30, 60, -20); moon.castShadow = !LOWQ;
-moon.shadow.mapSize.set(2048, 2048); moon.shadow.camera.near = 1; moon.shadow.camera.far = 200;
+moon.shadow.mapSize.set(isTouch ? 2048 : 4096, isTouch ? 2048 : 4096); moon.shadow.camera.near = 1; moon.shadow.camera.far = 200;
 { const sc = moon.shadow.camera; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; } moon.shadow.bias = -0.0015;
 scene.add(moon); scene.add(moon.target);
 const torchL = new THREE.PointLight(0xffa040, 0, 26, 1.7); scene.add(torchL);
@@ -107,6 +109,18 @@ const inWater = (x, z) => W.waterY != null && terrainH(x, z) < W.waterY - 0.45;
 // ---------------- character rigs ----------------
 const MAT = { skinK: new THREE.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.85 }), skinS: new THREE.MeshStandardMaterial({ color: 0x3d2e22, roughness: 0.85 }), clothK: new THREE.MeshStandardMaterial({ color: 0x9a6a28, roughness: 0.9 }), clothS: new THREE.MeshStandardMaterial({ color: 0x2f5a6a, roughness: 0.9 }), clothM: new THREE.MeshStandardMaterial({ color: 0x6a4a3a, roughness: 0.9 }), dark: new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.9 }), red: new THREE.MeshStandardMaterial({ color: 0x8a2a2a, roughness: 0.8 }), steel: new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: 0.4, metalness: 0.8 }), wood: new THREE.MeshStandardMaterial({ color: 0x5a3a1c, roughness: 0.9 }), eye: new THREE.MeshBasicMaterial({ color: 0xff3020 }), flame: new THREE.MeshBasicMaterial({ color: 0xffa040 }) };
 for (const k in MAT) MAT[k].userData.shared = true;
+const _veshti = {};
+function veshtiTex(base) {
+  if (_veshti[base]) return _veshti[base];
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
+  x.fillStyle = base; x.fillRect(0, 0, 128, 128);
+  x.globalAlpha = 0.12; x.fillStyle = '#000';
+  for (let i = 0; i < 128; i += 8) x.fillRect(i, 0, 1, 128);
+  x.globalAlpha = 1; x.fillStyle = '#d8b040'; x.fillRect(0, 108, 128, 6); x.fillRect(0, 120, 128, 4);
+  x.fillStyle = '#8a1a12'; x.fillRect(0, 116, 128, 3);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1);
+  _veshti[base] = t; return t;
+}
 function box(w, h, d, m, x = 0, y = 0, z = 0) { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); me.castShadow = true; return me; }
 function limb(len, thick, m) { const j = new THREE.Group(); const me = new THREE.Mesh(new THREE.CapsuleGeometry(thick / 2, len - thick, 3, 6), m); me.position.y = -len / 2; me.castShadow = true; j.add(me); j.userData.len = len; return j; }
 function makeRig(kind) {
@@ -114,9 +128,31 @@ function makeRig(kind) {
   const broad = kind === 'K' ? 1.15 : kind === 'S' ? 0.92 : 0.85;
   const hips = new THREE.Group(); hips.position.y = 0.98; g.add(hips);
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.2 * broad, 0.42, 3, 8), kind === 'M' ? cloth : skin); torso.scale.set(1.35, 1, 0.75); torso.position.y = 0.38; torso.castShadow = true; hips.add(torso);
-  const waist = box(0.5 * broad, 0.34, 0.32, cloth, 0, 0.05, 0); hips.add(waist);
+  const waist = box(0.46 * broad, 0.18, 0.3, cloth, 0, 0.12, 0); hips.add(waist);
+  { const baseCol = kind === 'K' ? '#7a4e16' : kind === 'S' ? '#24485a' : '#54382a';
+    const skirtMat = new THREE.MeshStandardMaterial({ map: veshtiTex(baseCol), roughness: 0.9 });
+    const slen = kind === 'M' ? 0.78 : 0.44;
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.185 * broad, 0.225 * broad, slen, 12, 1, true), skirtMat); skirt.position.y = 0.03 - slen / 2; skirt.castShadow = true; skirt.material.side = THREE.DoubleSide; hips.add(skirt);
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.19 * broad, 0.03, 6, 14), new THREE.MeshStandardMaterial({ color: 0xc9a15c, metalness: 0.65, roughness: 0.35 })); belt.rotation.x = Math.PI / 2; belt.position.y = 0.05; hips.add(belt);
+    if (kind !== 'M') for (const sx of [-1, 1]) { const pec = new THREE.Mesh(new THREE.SphereGeometry(0.09 * broad, 9, 7), skin); pec.position.set(sx * 0.1 * broad, 0.49, 0.095); pec.scale.set(1.15, 0.75, 0.5); pec.castShadow = true; hips.add(pec); }
+    if (kind === 'M') { const blouse = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.3, 3, 8), MAT.red); blouse.scale.set(1.25, 0.85, 0.72); blouse.position.y = 0.44; blouse.castShadow = true; hips.add(blouse); }
+  }
   const neck = new THREE.Group(); neck.position.y = 0.72; hips.add(neck);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), skin); head.position.y = 0.16; head.scale.set(0.9, 1.1, 0.95); head.castShadow = true; neck.add(head);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), skin); head.position.y = 0.16; head.scale.set(0.9, 1.1, 0.95); head.castShadow = true; neck.add(head);
+  // face
+  { const eyeW = new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.35 });
+    for (const sx of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.021, 8, 6), eyeW); e.position.set(sx * 0.052, 0.185, 0.127); neck.add(e);
+      const pu = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 6, 5), MAT.dark); pu.position.set(sx * 0.052, 0.185, 0.146); neck.add(pu);
+      const br = box(0.055, 0.011, 0.018, MAT.dark, sx * 0.057, 0.223, 0.128); br.rotation.z = -sx * 0.18; neck.add(br);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 5), skin); ear.position.set(sx * 0.135, 0.155, 0.01); ear.scale.set(0.5, 1, 0.7); neck.add(ear);
+    }
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.021, 0.055, 5), skin); nose.rotation.x = Math.PI / 2 - 0.3; nose.position.set(0, 0.155, 0.142); neck.add(nose);
+    const mouth = box(0.05, 0.008, 0.014, new THREE.MeshStandardMaterial({ color: 0x4a201a, roughness: 0.7 }), 0, 0.103, 0.13); neck.add(mouth);
+    if (kind === 'K') { const mo = box(0.078, 0.02, 0.018, MAT.dark, 0, 0.126, 0.134); neck.add(mo); }
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), MAT.dark); hair.position.set(0, 0.185, -0.012); neck.add(hair);
+    if (kind === 'K') { const knot = new THREE.Mesh(new THREE.SphereGeometry(0.048, 8, 6), MAT.dark); knot.position.set(0, 0.315, -0.04); neck.add(knot); }
+  }
   if (kind === 'S') { const band = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 14), MAT.red); band.rotation.x = Math.PI / 2; band.position.y = 0.2; neck.add(band); }
   if (kind === 'M') { const hair = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), MAT.dark); hair.position.set(0, 0.2, -0.05); hair.scale.set(1, 0.9, 1.1); neck.add(hair); const tail = box(0.08, 0.35, 0.08, MAT.dark, 0, 0.02, -0.18); neck.add(tail); }
   // shoulders / neck definition
@@ -134,16 +170,16 @@ function makeRig(kind) {
     const mm = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
     mark = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.38), mm); mark.position.set(0, 0.42, -0.205); mark.rotation.y = Math.PI; hips.add(mark);
   }
-  const mk = (side) => { const sh = new THREE.Group(); sh.position.set(side * 0.3 * broad, 0.62, 0); hips.add(sh); const up = limb(0.34, 0.11 * broad, skin); sh.add(up); const el = new THREE.Group(); el.position.y = -0.34; up.add(el); const fo = limb(0.32, 0.095 * broad, skin); el.add(fo); const hand = new THREE.Group(); hand.position.y = -0.32; fo.add(hand); return { sh, up, el, fo, hand }; };
+  const mk = (side) => { const sh = new THREE.Group(); sh.position.set(side * 0.3 * broad, 0.62, 0); hips.add(sh); const up = limb(0.34, 0.11 * broad, skin); sh.add(up); if (kind === 'K') { const band = new THREE.Mesh(new THREE.TorusGeometry(0.062 * broad, 0.016, 6, 10), new THREE.MeshStandardMaterial({ color: 0xd8b040, metalness: 0.7, roughness: 0.3 })); band.rotation.x = Math.PI / 2; band.position.y = -0.1; up.add(band); } const el = new THREE.Group(); el.position.y = -0.34; up.add(el); const fo = limb(0.32, 0.095 * broad, skin); el.add(fo); const hand = new THREE.Group(); hand.position.y = -0.32; fo.add(hand); const palm = box(0.065, 0.09, 0.042, skin, 0, -0.02, 0); hand.add(palm); const thumb = box(0.024, 0.05, 0.024, skin, -side * 0.042, -0.005, 0.015); thumb.rotation.z = -side * 0.45; hand.add(thumb); return { sh, up, el, fo, hand }; };
   const Lm = mk(-1), R = mk(1);
   const mkLeg = (side) => { const hp = new THREE.Group(); hp.position.set(side * 0.13 * broad, -0.02, 0); hips.add(hp); const th = limb(0.48, 0.15 * broad, cloth); hp.add(th); const kn = new THREE.Group(); kn.position.y = -0.48; th.add(kn); const sh = limb(0.46, 0.12 * broad, skin); kn.add(sh); const foot = box(0.12, 0.08, 0.26, MAT.dark, 0, -0.46, 0.06); kn.add(foot); return { hp, th, kn, sh }; };
   const LL = mkLeg(-1), RL = mkLeg(1);
-  let weapon = null;
-  if (kind === 'K') { weapon = new THREE.Group(); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), MAT.wood); pole.position.y = 0.35; weapon.add(pole); const hook = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 6, 12, Math.PI * 1.3), MAT.steel); hook.position.y = 1.1; hook.rotation.z = -0.4; weapon.add(hook); const spike = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.3, 6), MAT.steel); spike.position.y = 1.25; weapon.add(spike); weapon.rotation.x = Math.PI / 2 + 0.2; R.hand.add(weapon); }
-  if (kind === 'S') { weapon = new THREE.Group(); const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.3, 6), MAT.wood); stick.position.y = 0.3; weapon.add(stick); weapon.rotation.x = Math.PI / 2 + 0.2; R.hand.add(weapon); }
+  let weapon = null, wmats = null;
+  if (kind === 'K') { const wWood = MAT.wood.clone(); wWood.userData = { base: new THREE.Color(0x5a3a1c) }; const wSteel = MAT.steel.clone(); wSteel.userData = { base: new THREE.Color(0x9aa0a8) }; wmats = [wWood, wSteel]; weapon = new THREE.Group(); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), wWood); pole.position.y = 0.35; weapon.add(pole); const hook = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 6, 12, Math.PI * 1.3), wSteel); hook.position.y = 1.1; hook.rotation.z = -0.4; weapon.add(hook); const spike = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.3, 6), wSteel); spike.position.y = 1.25; weapon.add(spike); weapon.rotation.x = Math.PI / 2 + 0.2; R.hand.add(weapon); }
+  if (kind === 'S') { const wWood = MAT.wood.clone(); wWood.userData = { base: new THREE.Color(0x5a3a1c) }; wmats = [wWood]; weapon = new THREE.Group(); const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.3, 6), wWood); stick.position.y = 0.3; weapon.add(stick); weapon.rotation.x = Math.PI / 2 + 0.2; R.hand.add(weapon); }
   // hand torch (hidden unless level enables)
   const htorch = new THREE.Group(); { const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.7, 5), MAT.wood); stick.position.y = 0.2; htorch.add(stick); const fl = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 6), MAT.flame); fl.position.y = 0.65; htorch.add(fl); htorch.visible = false; htorch.rotation.x = Math.PI / 2 + 0.3; Lm.hand.add(htorch); }
-  return { g, hips, torso, neck, head, L: Lm, R, LL, RL, weapon, htorch, mark, kind };
+  return { g, hips, torso, neck, head, L: Lm, R, LL, RL, weapon, htorch, mark, wmats, kind };
 }
 function poseRig(r, a) {
   const s = (v) => Math.sin(v); const st = a.t;
@@ -204,6 +240,7 @@ function makeHunter(type) {
   const T_ = ETYPES[type];
   if (T_.rig === 'croc') return makeCroc(T_);
   if (T_.rig === 'snake') return makeSnake(T_);
+  if (T_.rig === 'fox') return FOX.ready ? makeFox(T_) : makeBeast(T_);
   if (T_.rig === 'beast') return makeBeast(T_);
   const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.95, emissive: 0x000000 });
   if (T_.emissive) { m.emissive.setHex(T_.emissive); m.emissiveIntensity = 0.35; }
@@ -225,8 +262,17 @@ function makeHunter(type) {
     const line = new THREE.Line(lgeo, new THREE.LineBasicMaterial({ color: 0xff2010, transparent: true, opacity: 0.7 })); line.visible = false; g.add(line); rig.aim = line; }
   return rig;
 }
+let _repTex = null;
+function reptileTex() {
+  if (_repTex) return _repTex;
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); const r = U.rng(31);
+  x.fillStyle = '#5a6a4a'; x.fillRect(0, 0, 256, 256);
+  for (let ry = 0; ry < 16; ry++) for (let cx = 0; cx < 16; cx++) { const ox = (ry % 2) * 8; const sh = 0.75 + r() * 0.5; x.fillStyle = `rgba(${52 * sh | 0},${66 * sh | 0},${40 * sh | 0},1)`; x.beginPath(); x.ellipse(cx * 16 + 8 + ox, ry * 16 + 8, 7, 6, 0, 0, 6.28); x.fill(); x.strokeStyle = 'rgba(20,26,16,0.7)'; x.stroke(); }
+  _repTex = new THREE.CanvasTexture(c); _repTex.wrapS = _repTex.wrapT = THREE.RepeatWrapping; _repTex.repeat.set(2, 2); _repTex.colorSpace = THREE.SRGBColorSpace;
+  return _repTex;
+}
 function makeCroc(T_) {
-  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.9, flatShading: true });
+  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.8, map: reptileTex() });
   const body = new THREE.Group(); body.position.y = 0.45; g.add(body);
   const trunk = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.8, 3, 8), m); trunk.rotation.x = Math.PI / 2; trunk.scale.set(1.15, 1, 0.6); trunk.castShadow = true; body.add(trunk);
   for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.25, 4), m); sp.position.set(0, 0.3, -0.9 + i * 0.35); body.add(sp); }
@@ -259,7 +305,7 @@ function poseCroc(r, h, gt) {
   r.mat.emissive.setRGB(flash * 0.9, flash * 0.12, flash * 0.05);
 }
 function makeSnake(T_) {
-  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.8, flatShading: true });
+  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: T_.color, roughness: 0.65, map: reptileTex() });
   const segs = []; let par = g, sc = 0.16;
   for (let i = 0; i < 7; i++) { const j = new THREE.Group(); j.position.set(0, i === 0 ? 0.16 : 0, i === 0 ? 0 : 0.34); par.add(j); const seg = new THREE.Mesh(new THREE.CapsuleGeometry(sc, 0.3, 3, 6), m); seg.rotation.x = Math.PI / 2; seg.position.z = 0.17; seg.castShadow = i < 4; j.add(seg); segs.push(j); par = j; sc *= 0.92; }
   const headG = new THREE.Group(); headG.position.z = 0.4; par.add(headG);
@@ -318,7 +364,44 @@ function poseBeast(r, h, gt) {
   const flash = (h.state === 'attack' && h.st < wu) ? (0.35 + 0.65 * Math.abs(s(gt * 28))) * (h.st / wu) : h.flashT > 0 ? h.flashT * 3 : 0;
   r.mat.emissive.setRGB(flash * 0.9, flash * 0.12, flash * 0.05);
 }
+// ---- real animated quadruped (Khronos Fox sample model, CC0) ----
+const FOX = { ready: false, glb: null, clips: {}, h: 1 };
+new GLTFLoader().load('./Fox.glb', g => {
+  g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  const bb = new THREE.Box3().setFromObject(g.scene); FOX.h = Math.max(0.001, bb.max.y - bb.min.y);
+  for (const c of g.animations) FOX.clips[c.name] = c;
+  FOX.glb = g; FOX.ready = true;
+  // upgrade any already-spawned beasts to the real model
+  for (const h of G.hunters) { if (ETYPES[h.type] && ETYPES[h.type].rig === 'fox' && h.rig && h.rig.custom === 'beast') { const nr = makeFox(ETYPES[h.type]); nr.g.position.copy(h.rig.g.position); nr.g.rotation.copy(h.rig.g.rotation); scene.remove(h.rig.g); scene.add(nr.g); h.rig = nr; } }
+}, undefined, () => { FOX.ready = false; });
+function makeFox(T_) {
+  const g = new THREE.Group();
+  const inner = skeletonClone(FOX.glb.scene);
+  const s = (1.3 * (T_.scale || 1)) / FOX.h;
+  inner.scale.setScalar(s); inner.rotation.y = 0;
+  const mats = [];
+  inner.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.color = new THREE.Color(T_.tint || 0xb99468); mats.push(o.material); } });
+  g.add(inner);
+  const mixer = new THREE.AnimationMixer(inner);
+  const act = {}; for (const k in FOX.clips) { act[k] = mixer.clipAction(FOX.clips[k]); }
+  if (act.Survey) act.Survey.play();
+  return { g, inner, mixer, act, cur: 'Survey', mats, custom: 'fox' };
+}
+function foxClip(r, name, fade = 0.16) { if (!r.act[name] || r.cur === name) return; if (r.act[r.cur]) r.act[r.cur].fadeOut(fade); r.act[name].reset().fadeIn(fade).play(); r.cur = name; }
+function poseFox(r, h, gt) {
+  const s = Math.sin;
+  if (h.state === 'dead') { if (!r.deadDone) { r.deadDone = true; for (const k in r.act) r.act[k].fadeOut(0.15); } const k = U.clamp(h.st / 0.6, 0, 1); r.inner.rotation.z = k * Math.PI * 0.5; r.inner.position.y = -k * 0.12; }
+  else if (h.state === 'sink') { const k = U.clamp(h.st / 2.2, 0, 1); r.inner.position.y = -k * 1.3; foxClip(r, 'Walk'); }
+  else if (h.state === 'attack') { foxClip(r, 'Run', 0.08); const wu = h.windup, k = U.clamp(h.st / (wu + 0.3), 0, 1); const wk = wu / (wu + 0.3); const anti = U.smooth(U.clamp(k / wk, 0, 1)), lunge = U.smooth(U.clamp((k - wk) / 0.5, 0, 1)); r.inner.rotation.x = 0.28 * anti - 0.5 * lunge; r.inner.position.y = 0.12 * anti + 0.12 * lunge; }
+  else if (h.state === 'stagger') { foxClip(r, 'Survey'); r.inner.rotation.x = s(U.clamp(h.st / 0.35, 0, 1) * Math.PI) * -0.3; }
+  else if (h.state === 'chase' || h.state === 'frenzy' || h.state === 'charge') { foxClip(r, 'Run'); r.inner.rotation.x = 0; r.inner.position.y = 0; }
+  else if (h.state === 'investigate' || h.state === 'patrol' || h.state === 'reposition' || h.state === 'return') { foxClip(r, 'Walk'); r.inner.rotation.x = 0; r.inner.position.y = 0; }
+  else { foxClip(r, 'Survey'); r.inner.rotation.x = 0; r.inner.position.y = 0; }
+  const flash = (h.state === 'attack' && h.st < h.windup) ? (0.35 + 0.65 * Math.abs(s(gt * 28))) * (h.st / h.windup) : h.flashT > 0 ? h.flashT * 3 : 0;
+  for (const m of r.mats) if (m.emissive) m.emissive.setRGB(flash * 0.9, flash * 0.12, flash * 0.05);
+}
 function poseHunter(r, h, gt) {
+  if (r.custom === 'fox') return poseFox(r, h, gt);
   if (r.custom === 'croc') return poseCroc(r, h, gt);
   if (r.custom === 'snake') return poseSnake(r, h, gt);
   if (r.custom === 'beast') return poseBeast(r, h, gt);
@@ -363,7 +446,7 @@ const BLOOD = (() => {
   const P = []; for (let i = 0; i < N; i++) P.push({ on: 0 });
   let head = 0; const d = new THREE.Object3D();
   return {
-    spawn(x, z, s, pool) { const p = P[head]; head = (head + 1) % N; p.on = 1; p.x = x; p.z = z; p.s = s * (0.8 + Math.random() * 0.6); p.grow = pool ? s * 1.6 : p.s; p.rot = Math.random() * 6.28; p.age = 0; p.max = pool ? 45 : 25; },
+    spawn(x, z, s, pool) { const p = P[head]; head = (head + 1) % N; p.on = 1; p.x = x; p.z = z; p.s = s * (0.8 + Math.random() * 0.6); p.grow = pool ? s * 1.7 : p.s; p.rot = Math.random() * 6.28; p.age = 0; p.max = pool ? 9999 : 50; },
     clear() { for (const p of P) p.on = 0; },
     update(dt) { for (let i = 0; i < N; i++) { const p = P[i]; if (!p.on) { d.scale.setScalar(0); d.position.set(0, -60, 0); } else { p.age += dt; if (p.s < p.grow) p.s = Math.min(p.grow, p.s + dt * 0.9); const fade = p.age > p.max - 6 ? Math.max(0, (p.max - p.age) / 6) : 1; if (fade <= 0) { p.on = 0; continue; } let y = terrainH(p.x, p.z); if (W.waterY != null && y < W.waterY - 0.2) y = W.waterY; d.position.set(p.x, y + 0.045, p.z); d.rotation.set(0, p.rot, 0); d.scale.set(p.s * fade * 0.4 + p.s * 0.6, 1, p.s * fade * 0.4 + p.s * 0.6); } d.updateMatrix(); im.setMatrixAt(i, d.matrix); } im.instanceMatrix.needsUpdate = true; }
   };
@@ -420,13 +503,13 @@ function addSound(x, z, r, kind, p) { G.sounds.push({ x, z, r, kind, p, life: 0.
 let shake = 0;
 function juice(kind, x, y, z, dx, dz) {
   const hasDir = dx != null;
-  if (kind === 'hit') { G.hitStop = Math.max(G.hitStop, 0.055); shake = Math.max(shake, 0.25); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 12, 0x6a0d08, 7, 0.9, 0.7); PARTS.markBlood(12); } PARTS.spawn(x, y, z, 10, 0x5a0a06, 3, 3, 0.9, 0.6); PARTS.markBlood(6); PARTS.spawn(x, y, z, 4, 0xffb060, 5, 4, 0.5, 0.25); BLOOD.spawn(x, z, 0.5, false); A.sfx('clatter', 0.5); }
-  else if (kind === 'heavy') { G.hitStop = Math.max(G.hitStop, 0.11); shake = Math.max(shake, 0.7); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 22, 0x6a0d08, 10, 1.2, 0.9); PARTS.markBlood(22); } PARTS.spawn(x, y, z, 20, 0x5a0a06, 5, 5, 1.2, 0.8); PARTS.markBlood(12); PARTS.spawn(x, y, z, 8, 0xffb060, 7, 5, 0.6, 0.3); BLOOD.spawn(x, z, 0.9, false); A.sfx('thud', 0.5); A.sfx('clatter', 0.5); }
-  else if (kind === 'kill') { G.slowmo = 0.45; G.fovT = 50; shake = Math.max(shake, 0.5); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 26, 0x5a0a06, 9, 1.3, 1.1); PARTS.markBlood(26); } PARTS.spawn(x, y, z, 30, 0x4a0806, 5, 6, 1.3, 1.1); PARTS.markBlood(18); BLOOD.spawn(x, z, 1.7, true); A.sfx('death', 0.5); }
+  if (kind === 'hit') { G.hitStop = Math.max(G.hitStop, 0.055); shake = Math.max(shake, 0.25); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 16, 0x6a0d08, 7, 0.5, 0.7); PARTS.markBlood(12); } PARTS.spawn(x, y, z, 14, 0x5a0a06, 3, 3, 0.5, 0.6); PARTS.markBlood(6); PARTS.spawn(x, y, z, 4, 0xffb060, 5, 4, 0.5, 0.25); BLOOD.spawn(x, z, 0.5, false); A.sfx('clatter', 0.5); }
+  else if (kind === 'heavy') { G.hitStop = Math.max(G.hitStop, 0.11); shake = Math.max(shake, 0.7); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 28, 0x6a0d08, 10, 0.65, 0.9); PARTS.markBlood(22); } PARTS.spawn(x, y, z, 26, 0x5a0a06, 5, 5, 0.6, 0.8); PARTS.markBlood(12); PARTS.spawn(x, y, z, 8, 0xffb060, 7, 5, 0.6, 0.3); BLOOD.spawn(x, z, 0.9, false); A.sfx('thud', 0.5); A.sfx('clatter', 0.5); }
+  else if (kind === 'kill') { G.slowmo = 0.45; G.fovT = 50; shake = Math.max(shake, 0.5); if (hasDir) { PARTS.jet(x, y, z, dx, dz, 32, 0x5a0a06, 9, 0.7, 1.1); PARTS.markBlood(26); } PARTS.spawn(x, y, z, 36, 0x4a0806, 5, 6, 0.65, 1.1); PARTS.markBlood(18); BLOOD.spawn(x, z, 1.7, true); A.sfx('death', 0.5); }
   else if (kind === 'slam') { shake = Math.max(shake, 1.0); PARTS.spawn(x, terrainH(x, z) + 0.2, z, 40, 0x4a5a30, 8, 5, 1.2, 0.8); A.sfx('thud', 0.5); A.sfx('wave', 0.5); }
   else if (kind === 'hurt') { G.hitStop = Math.max(G.hitStop, 0.08); shake = Math.max(shake, 0.6); hurtFlash(); A.sfx('thud', 0.5); }
   else if (kind === 'rise') { PARTS.spawn(x, terrainH(x, z) + 0.3, z, 30, 0x3a4a28, 5, 6, 1.2, 0.9); A.sfx('growl', 0.5); shake = Math.max(shake, 0.3); }
-  else if (kind === 'stealth') { G.slowmo = 0.6; G.fovT = 48; PARTS.spawn(x, y, z, 26, 0x4a0806, 3, 4, 1.1, 1.0); PARTS.markBlood(16); BLOOD.spawn(x, z, 1.4, true); A.sfx('rope', 0.5); A.sfx('death', 0.5); }
+  else if (kind === 'stealth') { G.slowmo = 0.6; G.fovT = 48; PARTS.spawn(x, y, z, 30, 0x4a0806, 3, 4, 0.6, 1.0); PARTS.markBlood(16); BLOOD.spawn(x, z, 1.4, true); A.sfx('rope', 0.5); A.sfx('death', 0.5); }
   else if (kind === 'wardbreak') { G.hitStop = Math.max(G.hitStop, 0.09); shake = Math.max(shake, 0.8); PARTS.spawn(x, y, z, 44, 0xffd060, 8, 7, 1.1, 0.9); A.sfx('bell', 0.7); A.sfx('clatter', 0.4); }
   else if (kind === 'wardhit') { PARTS.spawn(x, y, z, 8, 0xffd060, 3, 2.5, 0.6, 0.35); A.sfx('tick', 0.5); }
   else if (kind === 'splash') { PARTS.spawn(x, y, z, 22, 0x8ac8d8, 4, 5, 0.9, 0.7); A.sfx('splash', 0.5); }
@@ -436,6 +519,24 @@ function juice(kind, x, y, z, dx, dz) {
   else if (kind === 'fire') { PARTS.spawn(x, y, z, 20, 0xffa040, 3, 5, 0.9, 0.7); A.sfx('cue', 0.4); }
 }
 function bc(k, data = {}) { Net.send(Object.assign({ t: 'ev', k }, data)); }
+
+// ---------------- severed-limb debris ----------------
+const DEBRIS = [];
+function spawnLimb(x, y, z, dx, dz, scale = 1) {
+  if (DEBRIS.length > 18) { const o = DEBRIS.shift(); scene.remove(o.m); }
+  const g = new THREE.Group();
+  const lm = new THREE.Mesh(new THREE.CapsuleGeometry(0.06 * scale, 0.3 * scale, 3, 6), new THREE.MeshStandardMaterial({ color: 0x362419, roughness: 0.85 })); lm.castShadow = true; g.add(lm);
+  const stump = new THREE.Mesh(new THREE.SphereGeometry(0.068 * scale, 7, 6), new THREE.MeshStandardMaterial({ color: 0x4a0806, roughness: 0.55 })); stump.position.y = 0.18 * scale; g.add(stump);
+  scene.add(g); g.position.set(x, y, z);
+  const dl = Math.hypot(dx, dz) || 1;
+  DEBRIS.push({ m: g, x, y, z, vx: dx / dl * (3 + Math.random() * 3.5), vy: 4 + Math.random() * 3, vz: dz / dl * (3 + Math.random() * 3.5), rx: Math.random() * 10 - 5, rz: Math.random() * 10 - 5, life: 9 });
+}
+function debrisUpdate(dt) {
+  for (let i = DEBRIS.length - 1; i >= 0; i--) { const d = DEBRIS[i]; d.life -= dt; d.vy -= 14 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt; const g2 = terrainH(d.x, d.z) + 0.06; if (d.y < g2) { if (Math.abs(d.vy) > 1.2) BLOOD.spawn(d.x, d.z, 0.35, false); d.y = g2; d.vy *= -0.35; d.vx *= 0.55; d.vz *= 0.55; d.rx *= 0.4; d.rz *= 0.4; } d.m.position.set(d.x, d.y, d.z); d.m.rotation.x += d.rx * dt; d.m.rotation.z += d.rz * dt; if (d.life <= 0) { scene.remove(d.m); DEBRIS.splice(i, 1); } }
+}
+function clearDebris() { for (const d of DEBRIS) scene.remove(d.m); DEBRIS.length = 0; }
+let _bfxT = null;
+function bloodSplash() { const el = $('bloodfx'); if (!el) return; el.style.transition = 'none'; el.style.opacity = 0.85; clearTimeout(_bfxT); _bfxT = setTimeout(() => { el.style.transition = 'opacity 1.3s'; el.style.opacity = 0; }, 60); }
 
 // ---------------- enemies ----------------
 function instEnemy(type, x, z, state, yaw, arena, opts = {}) {
@@ -569,10 +670,7 @@ function enemyUpdate(dt) {
   const coopNow = !G.solo && other && other.tx != null;
   for (const h of G.hunters) {
     h.st += dt; h.flashT = Math.max(0, h.flashT - dt);
-    if (h.ward) {
-      h.wardDown = Math.max(0, h.wardDown - dt);
-      if (!coopNow && h.state !== 'dead' && h.state !== 'hidden') { h.soloT += dt; if (h.soloT > 8.5) { h.soloT = 0; h.wardDown = 3.4; const y2 = terrainH(h.x, h.z) + 1.2; juice('wardbreak', h.x, y2, h.z); banner(L('THE WARD GASPS OPEN', 'கவசம் மூச்சு விடுது'), L('Strike now!', 'இப்பவே அடி!'), 1.6); } }
-    }
+    if (h.ward) h.wardDown = Math.max(0, h.wardDown - dt);
     if (h.state === 'dead') { if (h.st > 3) h.rig.g.visible = false; continue; }
     if (h.state === 'hidden') continue;
     if (h.state === 'sink') { if (h.st > 2.2) { h.state = 'dead'; h.st = 0; G.kills++; bc('juice', { j: 'splash', x: h.x, y: 0.5, z: h.z }); juice('splash', h.x, 0.5, h.z); } continue; }
@@ -605,6 +703,8 @@ function damageHunter(h, dmg, from, kind = 'hit') {
   if (h.hp <= 0) {
     h.state = 'dead'; h.st = 0; G.kills++; if (h.def && h.def.once) h.def.done = true;
     juice(T_.vanish ? 'vanish' : 'kill', h.x, y, h.z, ddx, ddz); bc('juice', { j: T_.vanish ? 'vanish' : 'kill', x: h.x, y, z: h.z, dx: ddx, dz: ddz });
+    if (!T_.rig && !T_.vanish) { const nL = kind === 'heavy' ? 2 : (Math.random() < 0.4 ? 1 : 0); if (nL) { for (let i = 0; i < nL; i++) spawnLimb(h.x, y, h.z, ddx + (Math.random() - 0.5), ddz + (Math.random() - 0.5), T_.scale || 1); bc('limb', { x: h.x, y, z: h.z, dx: ddx, dz: ddz, n: nL, s: T_.scale || 1 }); } }
+    if (Math.hypot(h.x - me.x, h.z - me.z) < 9) bloodSplash();
     if (h.boss) setTimeout(() => A.horn(52, 5, 0.5), 400);
     if (T_.onDeath) T_.onDeath(CTX, h);
   } else {
@@ -697,7 +797,7 @@ function stealthKill(p, h) { if (!h || h.state === 'dead') return; h.hp = 0; h.s
 function revive(pt) { pt.down = false; pt.dead = false; pt.hp = 3; pt.anim = 'idle'; pt.at = 0; pt.inv = 1.5; bc('revived', { who: pt.who }); A.sfx('success', 0.5); }
 function unstick(pt) { const pu = pt === me ? other : me; pt.sink = 0; pt.inv = 1; const d = Math.hypot(pt.x - pu.x, pt.z - pu.z) || 1; pt.x += (pu.x - pt.x) / d * 2.2; pt.z += (pu.z - pt.z) / d * 2.2; bc('unstick', { who: pt.who, x: pt.x, z: pt.z }); A.sfx('rope', 0.6); banner(L('PULLED OUT', 'இழுத்துட்டோம்'), '', 1.4); }
 function addRage(p, v) { if (p.rageOn > 0) return; p.rage = Math.min(1, p.rage + v); if (p.rage >= 1 && !p.rageReady) { p.rageReady = true; if (p === me) { A.sfx('cue'); banner(L('TIGER READY — press R', 'புலி தயார் — R அழுத்து'), '', 2); } } if (p.rage < 1) p.rageReady = false; }
-function applyHit(p, dmg, reach, kind) { const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw); let any = 0; for (const h of G.hunters) { if (h.state === 'dead' || h.state === 'hidden') continue; const dx = h.x - p.x, dz = h.z - p.z, d = Math.hypot(dx, dz); const R = reach + ((ETYPES[h.type].scale || 1) - 1) * 1.2; if (d < R && (dx * fx2 + dz * fz2) / (d || 1) > 0.3) { damageHunter(h, dmg, p, kind); any++; } } const real = p.__real || p; if (any) { addRage(real, (kind === 'heavy' ? 0.14 : 0.07) * any); if (real === me) { G.combo++; G.comboT = 1.6; } else bc('combo', { who: real.who }); } }
+function applyHit(p, dmg, reach, kind) { const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw); let any = 0; for (const h of G.hunters) { if (h.state === 'dead' || h.state === 'hidden') continue; const dx = h.x - p.x, dz = h.z - p.z, d = Math.hypot(dx, dz); const R = reach + ((ETYPES[h.type].scale || 1) - 1) * 1.2; if (d < R && (dx * fx2 + dz * fz2) / (d || 1) > 0.3) { damageHunter(h, dmg, p, kind); any++; } } const real = p.__real || p; if (any) { real.gore = Math.min(1, (real.gore || 0) + 0.22 * any); addRage(real, (kind === 'heavy' ? 0.14 : 0.07) * any); if (real === me) { G.combo++; G.comboT = 1.6; } else bc('combo', { who: real.who }); } }
 function throwStone(p) { const s = { x: p.x + Math.sin(p.yaw) * 0.6, y: terrainH(p.x, p.z) + 1.4, z: p.z + Math.cos(p.yaw) * 0.6, vx: Math.sin(p.yaw) * 15, vy: 5.5, vz: Math.cos(p.yaw) * 15, m: new THREE.Mesh(new THREE.DodecahedronGeometry(0.09), MAT.steel), id: Math.random() }; scene.add(s.m); G.stones.push(s); A.sfx('whoosh', 0.5); if (!isAuth()) Net.send({ t: 'act', k: 'stone', s: { x: s.x, y: s.y, z: s.z, vx: s.vx, vy: s.vy, vz: s.vz, id: s.id } }); }
 function stonesUpdate(dt) { for (const s of G.stones) { if (s.done) continue; s.vy -= 16 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; s.m.position.set(s.x, s.y, s.z); s.m.rotation.x += dt * 10; const g = terrainH(s.x, s.z); let hitE = null; if (isAuth()) for (const h of G.hunters) { if (h.state === 'dead' || h.state === 'hidden') continue; if (Math.hypot(h.x - s.x, h.z - s.z) < 0.9 * (ETYPES[h.type].scale || 1) && Math.abs(s.y - g - 1) < 1.5) { hitE = h; break; } } if (hitE) { damageHunter(hitE, 1, { x: s.x - s.vx, z: s.z - s.vz, __real: me }); s.done = true; s.ttl = 0; } else if (s.y <= g + 0.08 || blocked(s.x, s.z, 0.05)) { s.done = true; s.y = g + 0.08; s.m.position.y = s.y; if (LV.onStoneLand) LV.onStoneLand(CTX, s); else A.sfx('stone', 0.5); if (isAuth()) { addSound(s.x, s.z, 22, 'stone'); bc('sfx', { n: 'stone' }); } s.ttl = 6; } } G.stones = G.stones.filter(s => { if (s.done && (s.ttl -= dt) <= 0) { scene.remove(s.m); return false; } return true; }); }
 function meeraUpdate(dt) { const trail = (other && other.tx != null && !G.solo) ? ((me.z > other.z) ? me : other) : me; const tx = trail.x + Math.sin(trail.yaw + Math.PI) * 2.4 + 1.2, tz = trail.z + Math.cos(trail.yaw + Math.PI) * 2.4; const dx = tx - meera.x, dz = tz - meera.z, d = Math.hypot(dx, dz); if (d > 1.2) { const sp = Math.min(6, d * 1.5); meera.x += dx / d * sp * dt; meera.z += dz / d * sp * dt; meera.yaw = Math.atan2(dx, dz); meera.anim = sp > 3 ? 'run' : 'walk'; meera.phase += dt * (sp > 3 ? 11 : 7); } else meera.anim = 'idle'; }
@@ -755,7 +855,7 @@ function loadLevel(i) {
   if (G.started) { if (LV.amb) A.ambience(LV.amb); const dr = LV.drums || ['heart', 64, 0.35]; A.drumsSet(dr[0], dr[1], dr[2]); }
 }
 function unloadLevel() {
-  BLOOD.clear();
+  BLOOD.clear(); clearDebris();
   if (!LG) return; scene.remove(LG);
   LG.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && !(o.material.userData && o.material.userData.shared)) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
   LG = null;
@@ -808,6 +908,7 @@ function onMessage(m) {
     else if (m.k === 'cue') cue(m.id, m.dur); else if (m.k === 'say') say(m.sp, m.id, m.dur); else if (m.k === 'sfx') A.sfx(m.n, 0.5);
     else if (m.k === 'juice') juice(m.j, m.x, m.y || terrainH(m.x, m.z) + 1, m.z, m.dx, m.dz);
     else if (m.k === 'twin') banner(L('TWIN STRIKE — THE WARD SHATTERS', 'இரட்டை வெட்டு — கவசம் உடைந்தது'), L('Six breaths of open flesh', 'ஆறு மூச்சுக்கு அது வெறும் சதை'), 2.2);
+    else if (m.k === 'limb') { for (let i = 0; i < (m.n || 1); i++) spawnLimb(m.x, m.y, m.z, m.dx + (Math.random() - 0.5), m.dz + (Math.random() - 0.5), m.s || 1); if (Math.hypot(m.x - me.x, m.z - me.z) < 9) bloodSplash(); }
     else if (m.k === 'hurt') { const p = m.who === 'K' ? K() : S(); p.hp = m.hp; if (p === me) { p.hitT = 0.35; p.anim = 'hit'; p.at = 0; p.inv = 0.9; p.x = m.x; p.z = m.z; juice('hurt', p.x, 0, p.z); } }
     else if (m.k === 'down') { const p = m.who === 'K' ? K() : S(); p.down = true; p.hp = 0; p.anim = 'dead'; p.at = 0; if (p === me) banner(L('DOWN — your partner can revive you (hold E)', 'விழுந்துட்டீங்க — நண்பர் E பிடிச்சு எழுப்பலாம்'), '', 4); }
     else if (m.k === 'revived') { const p = m.who === 'K' ? K() : S(); p.down = false; p.dead = false; p.hp = 3; p.anim = 'idle'; p.at = 0; p.inv = 1.5; A.sfx('success', 0.5); }
@@ -845,7 +946,7 @@ function rules() {
   $('rules-title').textContent = `${L('TRIAL', 'சோதனை')} ${ROMAN[LVI]} — ${LV.name()}`;
   const ul = $('rules-lines'); ul.innerHTML = '';
   LV.rules(CTX).forEach(l => { const li = document.createElement('li'); li.textContent = l; ul.appendChild(li); });
-  { const li = document.createElement('li'); li.textContent = L('THE GOLDEN WARD: this trial\'s keeper is warded — it barely bleeds. TWIN STRIKE: both players hit it within a breath and the ward shatters for six. Alone, the ward only gasps open every few breaths. The gate stays sealed while the keeper lives.', 'தங்கக் கவசம்: இந்த சோதனையின் காவலனுக்கு கவசம் — அடி பட்டாலும் ரத்தம் வராது. இரட்டை வெட்டு: இருவரும் ஒரே மூச்சில் அடித்தால் கவசம் ஆறு மூச்சுக்கு உடையும். தனியாக இருந்தால் கவசம் அவ்வப்போது தான் திறக்கும். காவலன் உயிரோட இருக்கும் வரை வாசல் திறக்காது.'); li.style.color = '#f0c060'; ul.appendChild(li); }
+  { const li = document.createElement('li'); li.textContent = L('THE GOLDEN WARD: this trial\'s keeper is warded — it barely bleeds, and ONE BLADE CAN NEVER BREAK IT. Only a TWIN STRIKE — both players hitting within a breath — shatters it for six. The gate stays sealed while the keeper lives, so the trial can only be CLEARED with a partner. Alone is practice.', 'தங்கக் கவசம்: இந்த சோதனையின் காவலனுக்கு கவசம் — அடி பட்டாலும் ரத்தம் வராது, ஒரு வாளால் அதை உடைக்கவே முடியாது. இரட்டை வெட்டு மட்டும்தான் — இருவரும் ஒரே மூச்சில் அடித்தால் — ஆறு மூச்சுக்கு உடையும். காவலன் உயிரோட இருக்கும் வரை வாசல் திறக்காது; சோதனையை முடிக்க நண்பர் கட்டாயம். தனியா என்றால் பயிற்சி மட்டும்.'); li.style.color = '#f0c060'; ul.appendChild(li); }
   $('rules').classList.remove('hidden');
   $('rules-ok').onclick = () => { $('rules').classList.add('hidden'); A.ensure(); G.readyMe = true; Net.send({ t: 'ready' }); $('lobby-status').textContent = ''; tryStart(); if (!G.started) { $('hud').classList.remove('hidden'); hint(T('ready')); } };
 }
@@ -863,20 +964,21 @@ function beginGame(lvl) {
 
 // ---------------- camera ----------------
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const _goreCol = new THREE.Color(0x4a0d07);
 function cameraUpdate(dt) {
   const p = me; G.camManualT = Math.max(0, (G.camManualT || 0) - dt);
   if (G.camManualT <= 0 && (p.anim === 'run' || p.anim === 'sneak' || p.anim === 'walk')) { let dy = (p.yaw + Math.PI) - G.camYaw; while (dy > Math.PI) dy -= 6.283; while (dy < -Math.PI) dy += 6.283; G.camYaw += dy * Math.min(1, dt * 1.8); }
   const fight = G.hunters.some(h => (h.state === 'chase' || h.state === 'attack' || h.state === 'charge' || h.state === 'rise' || h.state === 'roar' || h.state === 'frenzy' || h.state === 'surge' || h.state === 'aim') && Math.hypot(h.x - p.x, h.z - p.z) < 14);
-  const cy = G.camYaw, cp = G.camPitch; const dist = fight ? 6.4 : 5.2, height = fight ? 2.6 : 2.2;
+  const cy = G.camYaw, cp = G.camPitch; const dist = fight ? 5.9 : 4.7, height = fight ? 2.35 : 2.0;
   const px = p.x, pz = p.z, py = terrainH(p.x, p.z);
   const bx = px + Math.sin(cy) * dist * Math.cos(cp), bz = pz + Math.cos(cy) * dist * Math.cos(cp), by = py + height - Math.sin(cp) * dist;
-  const ox = Math.cos(cy) * 0.8, oz = -Math.sin(cy) * 0.8; const tx = bx + ox, tz = bz + oz; const ty = Math.max(by, terrainH(tx, tz) + 0.6, W.waterY != null ? W.waterY + 0.7 : -1e9);
+  const ox = Math.cos(cy) * 1.0, oz = -Math.sin(cy) * 1.0; const tx = bx + ox, tz = bz + oz; const ty = Math.max(by, terrainH(tx, tz) + 0.6, W.waterY != null ? W.waterY + 0.7 : -1e9);
   camPos.lerp(new THREE.Vector3(tx, ty, tz), Math.min(1, dt * 7));
   camLook.lerp(new THREE.Vector3(px - Math.sin(cy) * 1.5 + ox * 0.5, py + 1.35, pz - Math.cos(cy) * 1.5 + oz * 0.5), Math.min(1, dt * 9));
   camera.position.copy(camPos); if (shake > 0) { camera.position.x += (Math.random() - 0.5) * shake * 0.35; camera.position.y += (Math.random() - 0.5) * shake * 0.25; shake = Math.max(0, shake - dt * 2.5); }
   camera.lookAt(camLook);
   if (G.roll) camera.rotateZ(G.roll);
-  G.fovT += (58 - G.fovT) * Math.min(1, dt * 2.5); camera.fov += (G.fovT - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix();
+  G.fovT += (55 - G.fovT) * Math.min(1, dt * 2.5); camera.fov += (G.fovT - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix();
 }
 
 // ---------------- HUD ----------------
@@ -893,7 +995,7 @@ function hudUpdate(dt) {
   else if (st) obj = L('E — SILENT KILL', 'E — அமைதியான கொலை');
   else if (me.nearInter) obj = me.nearInter.label();
   if (me.down) obj = partner ? L('DOWN — wait for your partner', 'விழுந்துட்டீங்க — நண்பருக்காக இருங்க') : '';
-  if (obj == null) { const wd = G.hunters.find(h => h.ward && h.state !== 'dead' && h.state !== 'hidden' && Math.hypot(h.x - me.x, h.z - me.z) < 24); if (wd) obj = wd.wardDown > 0 ? L('THE WARD IS DOWN — CUT DEEP', 'கவசம் கீழ — ஆழமா வெட்டு') : (partner ? L('TWIN STRIKE — both of you hit it within a breath', 'இரட்டை வெட்டு — ரெண்டு பேரும் ஒரே மூச்சுல அடிங்க') : L('Alone, the ward only gasps open every few breaths — wait for it', 'தனியா கவசம் அவ்வப்போ தான் திறக்கும் — காத்திரு')); }
+  if (obj == null) { const wd = G.hunters.find(h => h.ward && h.state !== 'dead' && h.state !== 'hidden' && Math.hypot(h.x - me.x, h.z - me.z) < 24); if (wd) obj = wd.wardDown > 0 ? L('THE WARD IS DOWN — CUT DEEP', 'கவசம் கீழ — ஆழமா வெட்டு') : (partner ? L('TWIN STRIKE — both of you hit it within a breath', 'இரட்டை வெட்டு — ரெண்டு பேரும் ஒரே மூச்சுல அடிங்க') : L('ONE BLADE CANNOT BREAK THIS WARD — bring a partner to clear the trial', 'ஒரு வாள் இந்தக் கவசத்தை உடைக்காது — சோதனையை முடிக்க நண்பரை கூட்டி வா')); }
   if (obj == null && G.gateZ != null && me.z < G.gateZ + 30) { const kAlive = EDEFS.some(d => d.gateKeeper && !d.done); if (kAlive) obj = L('THE GATE IS SEALED — its keeper still lives', 'வாசல் மூடியிருக்கு — காவலன் இன்னும் உயிரோட'); }
   if (obj == null && LV.objective) obj = LV.objective(CTX);
   if (LV.waypointFn) target = LV.waypointFn(CTX);
@@ -946,8 +1048,9 @@ function frame(now) {
     poseRig(p.rig, { anim: p.anim, t: p.at, phase: p.phase, combo: p.combo, globalT: G.t + (p.who === 'S' ? 1.3 : 0), torch: p.torch });
     if (p.rig.mark) p.rig.mark.material.opacity = p.rageOn > 0 ? 0.85 + Math.sin(G.t * 9) * 0.15 : 0.5 + Math.sin(G.t * 1.6) * 0.08;
   }
-  for (const h of G.hunters) { if (!h.rig.g.visible) continue; let hy = terrainH(h.x, h.z); if (ETYPES[h.type].rig === 'croc' && inWater(h.x, h.z)) hy = Math.min(hy, W.waterY - 0.5); if (h.state === 'sink') hy -= Math.min(1, h.st / 2.2) * 1.6; h.rig.g.position.set(h.x, hy, h.z); h.rig.g.rotation.y = h.yaw; poseHunter(h.rig, h, G.t + h.id); if (h.wardMesh) { const up = h.wardDown <= 0 && h.state !== 'dead'; h.wardMesh.visible = up; if (up) { h.wardMesh.material.opacity = 0.12 + 0.08 * Math.abs(Math.sin(G.t * 3 + h.id)); h.wardMesh.scale.setScalar((ETYPES[h.type].scale || 1) * (1.3 + Math.sin(G.t * 2.2 + h.id) * 0.06)); } } }
-  PARTS.update(dt); BLOOD.update(dt);
+  for (const h of G.hunters) { if (!h.rig.g.visible) continue; let hy = terrainH(h.x, h.z); if (ETYPES[h.type].rig === 'croc' && inWater(h.x, h.z)) hy = Math.min(hy, W.waterY - 0.5); if (h.state === 'sink') hy -= Math.min(1, h.st / 2.2) * 1.6; h.rig.g.position.set(h.x, hy, h.z); h.rig.g.rotation.y = h.yaw; poseHunter(h.rig, h, G.t + h.id); if (h.rig.mixer && h.state !== 'dead') h.rig.mixer.update(dt * (h.state === 'chase' || h.state === 'frenzy' ? 1.5 : 1)); if (h.wardMesh) { const up = h.wardDown <= 0 && h.state !== 'dead'; h.wardMesh.visible = up; if (up) { h.wardMesh.material.opacity = 0.12 + 0.08 * Math.abs(Math.sin(G.t * 3 + h.id)); h.wardMesh.scale.setScalar((ETYPES[h.type].scale || 1) * (1.3 + Math.sin(G.t * 2.2 + h.id) * 0.06)); } } }
+  PARTS.update(dt); BLOOD.update(dt); debrisUpdate(dt);
+  for (const p of [me, other]) { if (!p || !p.rig.wmats) continue; p.gore = Math.max(0, (p.gore || 0) - dt * 0.015); for (const wm of p.rig.wmats) { wm.color.copy(wm.userData.base).lerp(_goreCol, Math.min(1, p.gore)); } }
   const k = K(); if (k && LV.heroLight !== false) { const ky = terrainH(k.x, k.z); torchL.position.set(k.x + Math.sin(k.yaw + 0.5) * 0.5, ky + 1.6, k.z + Math.cos(k.yaw + 0.5) * 0.5); torchL.intensity = (k.rig.g.visible ? 1 : 0) * (3.2 + Math.sin(G.t * 17) * 0.35 + Math.sin(G.t * 31) * 0.2) * (me.rageOn > 0 ? 1.6 : 1); torchL.color.setHex(me.rageOn > 0 ? 0xff6a30 : 0xffa040); } else torchL.intensity = 0;
   if (me.torch) { torchL2.position.set(me.x - Math.sin(me.yaw) * 0.3, terrainH(me.x, me.z) + 2.1, me.z - Math.cos(me.yaw) * 0.3); torchL2.intensity = 2.6 + Math.sin(G.t * 21) * 0.5; } else torchL2.intensity = 0;
   moon.position.set(me.x - 30, 60, me.z - 20); moon.target.position.set(me.x, 0, me.z); moon.target.updateMatrixWorld();

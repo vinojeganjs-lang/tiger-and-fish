@@ -75,6 +75,14 @@
   #fxa { position:absolute; inset:0; opacity:0; transition:opacity .5s; mix-blend-mode:normal; }
   #fade { position:fixed; inset:0; background:#000; opacity:1; transition:opacity .8s; z-index:8; pointer-events:none; }
   #lit { position:fixed; inset:0; background:linear-gradient(160deg, rgba(220,235,255,0.95), rgba(160,190,240,0.5)); opacity:0; transition:opacity .06s; z-index:7; pointer-events:none; mix-blend-mode:screen; }
+  #bloodfx { position:fixed; inset:0; opacity:0; z-index:7; pointer-events:none;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(90,8,5,0.65) 0 26px, rgba(90,8,5,0) 60px),
+      radial-gradient(circle at 85% 12%, rgba(80,7,4,0.55) 0 34px, rgba(80,7,4,0) 78px),
+      radial-gradient(circle at 22% 82%, rgba(95,9,6,0.6) 0 20px, rgba(95,9,6,0) 52px),
+      radial-gradient(circle at 90% 76%, rgba(85,8,5,0.6) 0 30px, rgba(85,8,5,0) 70px),
+      radial-gradient(ellipse at 50% 110%, rgba(70,6,4,0.5) 0 12%, rgba(70,6,4,0) 42%);
+  }
   /* touch */
   #touch { position:fixed; inset:0; pointer-events:none; z-index:6; }
   #stick { position:absolute; left:28px; bottom:40px; width:130px; height:130px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.25); pointer-events:auto; }
@@ -105,6 +113,7 @@
 <body>
 <canvas id="gl"></canvas>
 <div id="lit"></div>
+<div id="bloodfx"></div>
 <div id="fade"></div>
 <div class="icons"><button id="btn-mute" title="Mute">♪</button><button id="btn-fs" title="Fullscreen">⛶</button><button id="btn-fx" title="Toggle effects">FX</button></div>
 <div id="fps"></div>
@@ -138,7 +147,7 @@
     <div class="divider"></div>
     <div id="join-box">
       <div class="row"><button id="btn-create" class="btn" data-en="Create a room (play as Kumaran)" data-ta="Room உருவாக்கு (குமரனாக)">Create a room (play as Kumaran)</button>
-      <button id="btn-solo" class="btn ghost" data-en="Play alone" data-ta="தனியா விளையாடு">Play alone</button></div>
+      <button id="btn-solo" class="btn ghost" data-en="Practice alone (trials clear only in co-op)" data-ta="தனி பயிற்சி (co-op-ல மட்டும் clear ஆகும்)">Practice alone</button></div>
       <div class="divider"></div>
       <div class="row"><input id="join-code" class="code" maxlength="4" placeholder="CODE" autocomplete="off"><button id="btn-join" class="btn ghost" data-en="Join a room (play as Selvam)" data-ta="Room-ல சேர் (செல்வமாக)">Join a room (play as Selvam)</button></div>
     </div>

@@ -426,7 +426,7 @@ const T5 = {
     c.gate(-424, { seal: 0xffb040 });
     skyDisc(c, 0xffd9a0, 46, 120, 95, -430);
     for (const [x, z, h] of [[-34, -90, 26], [36, -150, 34], [-38, -230, 30], [34, -300, 38], [-30, -380, 28], [26, -60, 22]]) rockSpire(c, x, z, h);
-    c.etype('jackal', { hp: 4, speed: 7.8, scale: 0.85, windup: 0.28, dmg: 1, reach: 2.0, color: 0x6a5230, belly: 0x9a8258, poise: 0, rig: 'beast', noStealth: true });
+    c.etype('jackal', { hp: 4, speed: 7.8, scale: 0.85, windup: 0.28, dmg: 1, reach: 2.0, color: 0x6a5230, belly: 0x9a8258, tint: 0xb08a58, poise: 0, rig: 'fox', noStealth: true });
     // fruit trees (green canopy = food)
     const T = c.THREE;
     const fruitSpots = [[-16, -60], [20, -130], [-24, -210], [8, -285], [-14, -368]];
