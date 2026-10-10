@@ -250,7 +250,7 @@ function makePeerRoom() {
   };
   const room = {
     joinCode, err: null,
-    link: myCode ? location.origin + location.pathname + '#' + myCode : null,
+    link: myCode ? location.origin + location.pathname + '?join=' + myCode + '#' + myCode : null,
     peers() { const a = [{ peer: st.id || 'me', sameTab: true, presence: st.mine }]; for (const [k, v] of st.others) a.push({ peer: k, sameTab: false, presence: v }); return a; },
     connected() { return st.ok; },
     presence(patch) { const m = Object.assign({}, st.mine); for (const k in patch) { if (patch[k] === null) delete m[k]; else m[k] = patch[k]; } st.mine = m; send(); return Promise.resolve(); }
