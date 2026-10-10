@@ -106,7 +106,7 @@ const NET = {
     const n = this.room ? this.room.peers().length : 0;
     c.font = `400 13px ${BODY}`; c.fillStyle = '#8a7a66';
     c.fillText(`இப்போது இந்த link-ல் ${n} பேர் · ${n} here now   ·   Esc — பின் செல்`, W / 2, 470);
-    c.fillText('Keys on both laptops: ← → move · ↑ jump · Space shoot · ↓ crouch · X / Shift aim up', W / 2, 494);
+    c.fillText('Keys on both laptops: ← → move · ↑ jump · Space shoot · ↓ crouch · hold ↑ (or X) to aim up', W / 2, 494);
   },
 
   /* ----- host side ----- */
@@ -231,7 +231,7 @@ const NET = {
     c.font = `400 17px ${BODY}`; c.fillStyle = '#d9c7a8';
     c.fillText('Host (வீரமாறன்) Space அழுத்தி தொடங்கும் வரை காத்திருங்கள்…', W / 2, 300);
     c.fillText('Waiting for the host to start. Cutscenes are skipped from the host laptop.', W / 2, 326);
-    c.font = `400 13px ${BODY}`; c.fillStyle = '#8a7a66'; c.fillText('← → move · ↑ jump · Space shoot · ↓ crouch · X / Shift aim up   ·   Esc — leave', W / 2, 470);
+    c.font = `400 13px ${BODY}`; c.fillStyle = '#8a7a66'; c.fillText('← → move · ↑ jump · Space shoot · ↓ crouch · hold ↑ (or X) to aim up   ·   Esc — leave', W / 2, 470);
   }
 };
 /* PeerJS fallback (GitHub Pages etc.): a direct laptop-to-laptop link that looks like the room API.

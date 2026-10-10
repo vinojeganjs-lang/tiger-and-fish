@@ -264,8 +264,8 @@ function renderTitle(c, dt) {
     c.font = `600 12px ${EN}`; c.fillStyle = sel ? '#ffb066' : '#7a6a56'; c.fillText(o[1], 360, y - 2);
   });
   c.font = `400 12.5px ${BODY}`; c.fillStyle = '#9a8a74';
-  c.fillText('← → நகர் · ↑ தாவு · Space எய் · ↓ குனி · X / Shift மேலே குறி   (online-லும் இதே keys)', 62, 460);
-  c.fillText('ஒரே கீபோர்டில் 2-ஆம் வீரர்: A D நகர் · W தாவு · F எய் · S குனி · E மேலே குறி   ·   Gamepad ✓', 62, 480);
+  c.fillText('← → நகர் · ↑ தாவு · Space எய் · ↓ குனி · ↑ பிடித்தால் மேலே குறி   (online-லும் இதே keys)', 62, 460);
+  c.fillText('ஒரே கீபோர்டில் 2-ஆம் வீரர்: A D நகர் · W தாவு · F எய் · S குனி · W பிடித்தால் மேலே குறி   ·   Gamepad ✓', 62, 480);
   c.fillText('1 – 4 : நேரடியாக அத்தியாயம் தேர்வு', 62, 500);
   if (Math.floor(G.t * 2) % 2) { c.font = `700 15px ${TA}`; c.fillStyle = '#ffcf80'; c.fillText('Space / Enter / தட்டு — தொடங்கு', 62, 530 - 4); }
 }

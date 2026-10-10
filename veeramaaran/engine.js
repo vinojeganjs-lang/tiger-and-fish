@@ -35,9 +35,9 @@ cv.addEventListener('pointerdown', () => { G.clickP = true; AUDIO.unlock(); });
 
 const BIND = [
   // P1 (and every online player on their own laptop): arrows move, ↑ jump, Space shoot, X / Shift aim up
-  { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['KeyX', 'ShiftLeft', 'ShiftRight'], down: ['ArrowDown'], jump: ['ArrowUp'], fire: ['Space'] },
+  { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp', 'KeyX', 'ShiftLeft', 'ShiftRight'], down: ['ArrowDown'], jump: ['ArrowUp'], fire: ['Space'] },
   // P2 on the same keyboard: A D move, W jump, F shoot, E aim up, S crouch
-  { left: ['KeyA'], right: ['KeyD'], up: ['KeyE'], down: ['KeyS'], jump: ['KeyW'], fire: ['KeyF'] }
+  { left: ['KeyA'], right: ['KeyD'], up: ['KeyW', 'KeyE'], down: ['KeyS'], jump: ['KeyW'], fire: ['KeyF'] }
 ];
 const touch = { left: false, right: false, up: false, down: false, jump: false, fire: false, jumpP: false, fireP: false, startP: false };
 const padPrev = [{}, {}];
