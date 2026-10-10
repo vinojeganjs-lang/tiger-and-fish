@@ -84,7 +84,7 @@ const NET = {
     else if (!this.avail) { l1 = 'இந்த பார்வையில் ஆன்லைன் இணைப்பு கிடைக்கவில்லை'; l2 = 'Open this game in Claude while signed in. Your friend must be invited to it from the Share menu.'; }
     else if (this.mode === 'host') {
       if (gp) { l1 = 'செங்கன் இணைந்தான்!'; l2 = 'Player 2 connected. Press Space to begin the saga.'; }
-      else { l1 = 'நண்பருக்காக காத்திருக்கிறது…'; l2 = 'Waiting for Player 2. Send your friend the link (below on GitHub, or this page's link in Claude); they pick Online and press Space.'; }
+      else { l1 = 'நண்பருக்காக காத்திருக்கிறது…'; l2 = 'Waiting for Player 2. Send your friend the link (below on GitHub, or the Claude page link); they pick Online and press Space.'; }
       l3 = 'நீங்கள் = வீரமாறன் (Host)';
     } else if (hosts.length) { l1 = 'ஒரு போர் காத்திருக்கிறது!'; l2 = 'A host is waiting. Press Space to join as Sengan (Player 2).'; l3 = 'H — நானே Host ஆகிறேன்'; }
     else { l1 = 'Space — புதிய போரை தொடங்கு (Host)'; l2 = 'Press Space to host. Your friend opens the same link and joins.'; }
