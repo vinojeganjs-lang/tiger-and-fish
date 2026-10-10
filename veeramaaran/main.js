@@ -20,15 +20,25 @@ function buildLevel(i) {
 }
 const STAGE_NAMES = [['கானகம்', 'The Burning Forest'], ['கடல்', 'The Corsair Sea'], ['கார்மலைக் கோட்டை', 'The Fortress of Kaarmalai'], ['பெரும்போர்', 'The Great War']];
 const POST = [['after1', 'ch2'], ['after2', 'ch3'], ['after3', 'pre4', 'ch4'], ['victory', 'aging', 'funeral', 'credits']];
+const CH_NAMES = [['பிறப்பும் கானகமும்', 'Birth · The Burning Forest'], ['கடல்', 'The Corsair Sea'], ['கார்மலைக் கோட்டை', 'The Fortress of Kaarmalai'], ['பெரும்போர்', 'The Great War']];
 
 /* ===== Flow ===== */
-let menuSel = (/[#=][a-z0-9]{6}/.test(location.hash + location.search) || (() => { try { return (localStorage.getItem('veeran-friends') || '[]') !== '[]'; } catch (e) { return false; } })()) ? 2 : 0;
-function startGame(n, stage = 0) {
+let menuSel = (/^#[a-z0-9]{6}$/.test(location.hash) || /[?&]join=[a-z0-9]{6}/.test(location.search) || (() => { try { return (localStorage.getItem('veeran-friends') || '[]') !== '[]'; } catch (e) { return false; } })()) ? 2 : 0;
+/* ===== Save progress (per browser) ===== */
+const SAVE = {
+  get() { try { const s = JSON.parse(localStorage.getItem('veeran-save') || '{}'); return { ch: Math.max(0, Math.min(3, s.ch | 0)), done: !!s.done }; } catch (e) { return { ch: 0, done: false }; } },
+  put(s) { try { localStorage.setItem('veeran-save', JSON.stringify(s)); } catch (e) { } },
+  reach(i) { const s = this.get(); if (i > s.ch) { s.ch = i; this.put(s); G.savedT = 3; } },
+  finish() { const s = this.get(); s.done = true; this.put(s); }
+};
+function startGame(n, stage = 0, pick = true) {
   G.nPlayers = n; G.players = [new Player(0)]; if (n === 2) G.players.push(new Player(1));
+  if (pick && stage === 0 && SAVE.get().ch > 0) { G.state = 'chapters'; G.chSel = SAVE.get().ch; G.chT = 0; return; }
   if (stage > 0) { startStage(stage); return; }
   runScenes(['birth', 'youth', 'ch1'], () => startStage(0));
 }
 function startStage(i) {
+  SAVE.reach(i);
   G.stage = i; G.level = buildLevel(i); G.cam = 0; G.boss = null; G.clearT = 0; G.bossGone = false;
   G.enemies = []; G.shots = []; G.eshots = []; G.parts = []; G.pickups = []; G.spawnT = 2.5; G.slow = 1; G.crowT = 4;
   G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.weapon = p.weapon || 'arrow'; p.reset(120 + k * 70); });
@@ -103,7 +113,7 @@ function updatePlay(dt) {
     G.clearT -= dt / Math.max(G.slow, 0.3);
     if (!G.bossGone && Math.random() < 0.35) { const b = G.boss.boxes().concat(G.boss.body()).filter(Boolean)[0] || { x: G.cam + W - 200, y: 300, w: 100, h: 100 }; fireBurst(b.x + rand(0, b.w), b.y + rand(0, b.h), 20, 1.3); if (Math.random() < 0.3) AUDIO.sfx('boom'); G.shake = 8; }
     if (!G.bossGone && G.clearT < 1.6) { G.bossGone = true; const b = G.boss.boxes().concat(G.boss.body()).filter(Boolean)[0]; if (b) { fireBurst(b.x + b.w / 2, b.y + b.h / 2, 120, 2.4); bloodBurst(b.x + b.w / 2, b.y + b.h / 2, 0, 40); } G.flash = 0.8; AUDIO.sfx('boom'); }
-    if (G.clearT <= 0) { G.clearT = 0; const i = G.stage; runScenes(POST[i], i < 3 ? () => startStage(i + 1) : toTitle); return; }
+    if (G.clearT <= 0) { G.clearT = 0; const i = G.stage; if (i === 3) SAVE.finish(); runScenes(POST[i], i < 3 ? () => startStage(i + 1) : toTitle); return; }
   }
   // player shots
   for (const s of G.shots) {
@@ -199,6 +209,7 @@ function drawHUD(c) {
   if (G.players.length < 2 && Math.floor(G.t * 1.5) % 2) {
     c.textAlign = 'right'; c.font = `600 13px ${BODY}`; c.fillStyle = 'rgba(159,184,255,.8)'; c.fillText('2-ஆம் வீரர்: F அழுத்தி சேருங்கள்', W - 20, 34);
   }
+  if (G.savedT > 0) { G.savedT -= 1 / 60; c.textAlign = 'center'; c.font = `600 14px ${BODY}`; c.fillStyle = `rgba(159,227,160,${Math.min(1, G.savedT)})`; c.fillText('✓ முன்னேற்றம் சேமிக்கப்பட்டது · Progress saved', W / 2, 30); }
   const b = G.boss;
   if (b && !G.bossGone) {
     const bw = 460, bx = W / 2 - bw / 2, by = H - 40, k = clamp(b.hp / b.max, 0, 1);
@@ -251,6 +262,36 @@ function renderPlay(c, dt) {
     if (G.goT > 1.5) { c.font = `600 16px ${BODY}`; c.fillStyle = '#ffcf80'; c.fillText('மீண்டும் எழ — Space / Enter / தட்டு   ·   Continue this chapter', W / 2, H / 2 + 70); }
   }
 }
+function chaptersFrame(raw) {
+  G.t += raw; G.chT += raw;
+  const max = SAVE.get().ch;
+  if (pressed.ArrowLeft || pressed.KeyA || pressed.ArrowUp || touch.left && !G._tl) G.chSel = Math.max(0, G.chSel - 1);
+  if (pressed.ArrowRight || pressed.KeyD || pressed.ArrowDown || touch.right && !G._tr) G.chSel = Math.min(max, G.chSel + 1);
+  G._tl = touch.left; G._tr = touch.right;
+  if (pressed.Escape) { if (NET.mode === 'host') { G.state = 'lobby'; } else G.state = 'title'; return; }
+  if (G.chT > 0.3 && startPressed()) { const n = G.nPlayers; startGame(n, G.chSel, false); return; }
+  const c = ctx;
+  drawBackground(c, THEMES[G.chSel], G.t * 25, G.t); c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(0, 0, W, H); drawEmbers(c, raw, G.t, 0.8);
+  c.textAlign = 'center';
+  c.font = `900 44px ${TA}`; c.fillStyle = '#ffe2b0'; c.shadowColor = 'rgba(255,80,10,.8)'; c.shadowBlur = 22; c.fillText('எங்கிருந்து தொடர?', W / 2, 110); c.shadowBlur = 0;
+  c.font = `600 15px ${EN}`; c.fillStyle = '#ffb066'; c.fillText('YOUR PROGRESS IS SAVED · CHOOSE A CHAPTER', W / 2, 140);
+  const cw = 196, gap = 16, x0 = W / 2 - (4 * cw + 3 * gap) / 2, rom = ['I', 'II', 'III', 'IV'];
+  for (let i = 0; i < 4; i++) {
+    const x = x0 + i * (cw + gap), y = 190, open = i <= max, sel = i === G.chSel;
+    c.fillStyle = sel ? 'rgba(255,120,40,.22)' : 'rgba(0,0,0,.45)'; c.fillRect(x, y, cw, 190);
+    c.strokeStyle = sel ? '#ff8a2a' : open ? 'rgba(232,179,58,.45)' : 'rgba(120,100,80,.3)'; c.lineWidth = sel ? 2 : 1; c.strokeRect(x + 0.5, y + 0.5, cw - 1, 189);
+    c.globalAlpha = open ? 1 : 0.35;
+    c.font = `900 40px ${EN}`; c.fillStyle = sel ? '#ffe2b0' : '#c9a882'; c.fillText(rom[i], x + cw / 2, y + 62);
+    c.font = `700 19px ${TA}`; c.fillStyle = '#f4e4c8'; wrapText(c, CH_NAMES[i][0], x + cw / 2, y + 108, cw - 20, 24);
+    c.font = `400 12px ${BODY}`; c.fillStyle = '#c9a882'; c.fillText(CH_NAMES[i][1], x + cw / 2, y + 160);
+    if (!open) { c.font = `600 13px ${BODY}`; c.fillStyle = '#8a7a66'; c.fillText('🔒 பூட்டப்பட்டது', x + cw / 2, y + 180); }
+    else if (i < max || (i === 3 && SAVE.get().done)) { c.font = `600 13px ${BODY}`; c.fillStyle = '#9fe3a0'; c.fillText('✓ முடிந்தது', x + cw / 2, y + 180); }
+    c.globalAlpha = 1;
+  }
+  c.font = `400 14px ${BODY}`; c.fillStyle = '#d9c7a8';
+  c.fillText('← → தேர்வு · Space தொடங்கு · Esc பின் செல்   ·   Chapter I = full story from birth', W / 2, 430);
+  if (NET.mode === 'host') { c.fillStyle = '#9fb8ff'; c.fillText('செங்கன் இணைந்துள்ளான் · Player 2 is connected and will play this chapter with you', W / 2, 458); }
+}
 function renderTitle(c, dt) {
   drawBackground(c, THEMES[0], G.t * 30, G.t);
   c.fillStyle = 'rgba(0,0,0,.45)'; c.fillRect(0, 0, W, H);
@@ -275,7 +316,7 @@ function renderTitle(c, dt) {
   c.font = `400 12.5px ${BODY}`; c.fillStyle = '#9a8a74';
   c.fillText('← → நகர் · ↑ தாவு · Space எய் · ↓ குனி · ↑ பிடித்தால் மேலே குறி   (online-லும் இதே keys)', 62, 460);
   c.fillText('ஒரே கீபோர்டில் 2-ஆம் வீரர்: A D நகர் · W தாவு · F எய் · S குனி · W பிடித்தால் மேலே குறி   ·   Gamepad ✓', 62, 480);
-  c.fillText('1 – 4 : நேரடியாக அத்தியாயம் தேர்வு', 62, 500);
+  { const sv = SAVE.get(); c.fillText(sv.ch > 0 ? `சேமிப்பு: அத்தியாயம் ${['I', 'II', 'III', 'IV'][sv.ch]} வரை திறந்துள்ளது · Saved up to Chapter ${['I', 'II', 'III', 'IV'][sv.ch]}${sv.done ? ' · story finished ✓' : ''}` : 'அத்தியாயம் முடித்தால் தானாக சேமிக்கப்படும் · Progress saves when you clear a chapter', 62, 500); }
   if (Math.floor(G.t * 2) % 2) { c.font = `700 15px ${TA}`; c.fillStyle = '#ffcf80'; c.fillText('Space / Enter / தட்டு — தொடங்கு', 62, 530 - 4); }
 }
 
@@ -297,10 +338,11 @@ function frame(now) {
       if (pressed.KeyW || pressed.ArrowUp || touch.up && !G._tu) menuSel = (menuSel + 2) % 3;
       if (pressed.KeyS || pressed.ArrowDown || touch.down && !G._td) menuSel = (menuSel + 1) % 3;
       G._tu = touch.up; G._td = touch.down;
-      for (let d = 1; d <= 4; d++) if (pressed['Digit' + d] && menuSel < 2) { startGame(menuSel + 1, d - 1); break; }
+      for (let d = 1; d <= 4; d++) if (pressed['Digit' + d] && menuSel < 2 && d - 1 <= SAVE.get().ch) { startGame(menuSel + 1, d - 1, false); break; }
       if (G.state === 'title' && startPressed()) { if (menuSel === 2) NET.enterLobby(); else startGame(menuSel + 1); }
       if (G.state === 'title') renderTitle(ctx, raw);
-    } else if (G.state === 'scene') { updateScene(raw); if (G.state === 'scene') { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); drawScene(ctx); } }
+    } else if (G.state === 'chapters') { chaptersFrame(raw); }
+    else if (G.state === 'scene') { updateScene(raw); if (G.state === 'scene') { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); drawScene(ctx); } }
     else if (G.state === 'play') { updatePlay(dt); if (G.state === 'play' || G.state === 'gameover') renderPlay(ctx, dt); }
     else if (G.state === 'gameover') {
       G.goT += raw; updateParts(dt); renderPlay(ctx, dt);

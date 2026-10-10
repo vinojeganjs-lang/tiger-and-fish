@@ -168,6 +168,7 @@ const NET = {
   },
   applySnap(s) {
     const live = s.m === 'play' || s.m === 'gameover';
+    if (live && typeof SAVE !== 'undefined') SAVE.reach(s.st);
     if (live && (!G.level || G.level.i !== s.st)) { G.level = buildLevel(s.st); G.stage = s.st; G.boss = null; G.parts = []; }
     G.state = live || s.m === 'scene' ? s.m : 'gwait';
     G.stage = s.st; G.cam = s.c; G.shake = Math.max(G.shake, s.sh); G.flash = Math.max(G.flash, s.fl); G.paused = !!s.pa; G.goT = s.go;
