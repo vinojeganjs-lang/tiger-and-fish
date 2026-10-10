@@ -258,10 +258,10 @@ function renderTitle(c, dt) {
   const opts = [['ஒரு வீரர்', '1 PLAYER'], ['இரு வீரர்கள் · ஒரே திரை', '2P · SAME KEYBOARD'], ['ஆன்லைன் · இரு லேப்டாப்', '2P · ONLINE LINK']];
   opts.forEach((o, i) => {
     const y = 330 + i * 38, sel = i === menuSel;
-    c.fillStyle = sel ? 'rgba(255,120,40,.18)' : 'rgba(0,0,0,0)'; c.fillRect(56, y - 26, 360, 36);
+    c.fillStyle = sel ? 'rgba(255,120,40,.18)' : 'rgba(0,0,0,0)'; c.fillRect(56, y - 26, 470, 36);
     if (sel) { c.fillStyle = '#ff8a2a'; c.fillRect(56, y - 26, 3, 36); }
     c.font = `700 20px ${TA}`; c.fillStyle = sel ? '#ffe2b0' : '#a8957a'; c.fillText(o[0], 72, y);
-    c.font = `600 12px ${EN}`; c.fillStyle = sel ? '#ffb066' : '#7a6a56'; c.fillText(o[1], 300, y - 2);
+    c.font = `600 12px ${EN}`; c.fillStyle = sel ? '#ffb066' : '#7a6a56'; c.fillText(o[1], 360, y - 2);
   });
   c.font = `400 12.5px ${BODY}`; c.fillStyle = '#9a8a74';
   c.fillText('← → நகர் · ↑ தாவு · Space எய் · ↓ குனி · X / Shift மேலே குறி   (online-லும் இதே keys)', 62, 460);
