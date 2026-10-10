@@ -22,7 +22,7 @@ const STAGE_NAMES = [['கானகம்', 'The Burning Forest'], ['கடல�
 const POST = [['after1', 'ch2'], ['after2', 'ch3'], ['after3', 'pre4', 'ch4'], ['victory', 'aging', 'funeral', 'credits']];
 
 /* ===== Flow ===== */
-let menuSel = /#[a-z0-9]{6}/.test(location.hash) ? 2 : 0;
+let menuSel = (/[#=][a-z0-9]{6}/.test(location.hash + location.search) || (() => { try { return (localStorage.getItem('veeran-friends') || '[]') !== '[]'; } catch (e) { return false; } })()) ? 2 : 0;
 function startGame(n, stage = 0) {
   G.nPlayers = n; G.players = [new Player(0)]; if (n === 2) G.players.push(new Player(1));
   if (stage > 0) { startStage(stage); return; }

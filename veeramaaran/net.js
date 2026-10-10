@@ -95,12 +95,16 @@ const NET = {
       const R = this.room;
       if (this.mode === 'host' && R.link && !gp) {
         c.font = `700 18px ${BODY}`; c.fillStyle = '#ffe08a'; c.fillText(R.link, W / 2, 410);
-        c.font = `400 13px ${BODY}`; c.fillStyle = '#c9a882'; c.fillText(this.copied ? 'Copied! Send it to your friend.' : 'C — link-ஐ copy செய் · Press C to copy this link and send it to your friend', W / 2, 434);
+        c.font = `400 13px ${BODY}`; c.fillStyle = '#c9a882'; c.fillText(this.copied ? 'Copied! Send it once — it never changes.' : 'C — copy · இந்த link நிரந்தரம், ஒரு முறை அனுப்பினால் போதும் · This link never changes', W / 2, 434);
         if (pressed.KeyC && navigator.clipboard) navigator.clipboard.writeText(R.link).then(() => { this.copied = true; }, () => { });
+      }
+      if (!R.joinCode && R.friends().length && !hosts.length && !this.mode) {
+        c.font = `400 14px ${BODY}`; c.fillStyle = '#9fb8ff';
+        c.fillText('நண்பர் online வந்தால் தானாக இணையும் · Your friend will appear here when they open the game', W / 2, 410);
       }
       if (R.joinCode && !hosts.length && !this.mode) {
         c.font = `400 14px ${BODY}`; c.fillStyle = R.err ? '#ff8a6a' : '#c9a882';
-        c.fillText(R.err ? `Host ${R.joinCode} not found. Ask your friend to open Online first, then reload.` : `Host ${R.joinCode}-உடன் இணைக்கிறது… connecting to your friend`, W / 2, 410);
+        c.fillText(R.err ? `Friend ${R.joinCode} is not online yet. It will connect by itself when they open the game, or press Space to host.` : `Host ${R.joinCode}-உடன் இணைக்கிறது… connecting to your friend`, W / 2, 410);
       }
     }
     const n = this.room ? this.room.peers().length : 0;
@@ -237,28 +241,57 @@ const NET = {
 /* PeerJS fallback (GitHub Pages etc.): a direct laptop-to-laptop link that looks like the room API.
    Host gets id veeran-<code>; the friend opens the same page with #<code> and connects to it. */
 function makePeerRoom() {
-  const joinCode = (location.hash.match(/[a-z0-9]{6}/) || [])[0] || null;
-  const myCode = joinCode ? null : Math.random().toString(36).slice(2, 8).padEnd(6, '0');
-  const st = { mine: {}, others: new Map(), conns: new Set(), ok: false, id: null };
-  const peer = myCode ? new Peer('veeran-' + myCode) : new Peer();
-  const send = () => { const msg = JSON.stringify(st.mine); for (const c of st.conns) if (c.open) { try { c.send(msg); } catch (e) { } } };
+  // Every browser keeps ONE fixed code forever, so the link you send once keeps working.
+  // Friends are remembered on both sides and re-dialled automatically.
+  const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
+  const q = new URLSearchParams(location.search).get('join');
+  let hashCode = (location.hash.match(/[a-z0-9]{6}/) || [])[0] || (q && /^[a-z0-9]{6}$/.test(q) ? q : null);
+  let myCode = LS.get('veeran-me');
+  if (!myCode || !/^[a-z0-9]{6}$/.test(myCode)) { myCode = Math.random().toString(36).slice(2, 8).padEnd(6, '0'); LS.set('veeran-me', myCode); }
+  if (hashCode === myCode) hashCode = null;
+  let friends = []; try { friends = JSON.parse(LS.get('veeran-friends') || '[]').filter(f => /^[a-z0-9]{6}$/.test(f)); } catch (e) { }
+  const addFriend = f => { if (!f || f === myCode) return; friends = [f].concat(friends.filter(x => x !== f)).slice(0, 6); LS.set('veeran-friends', JSON.stringify(friends)); };
+  if (hashCode) addFriend(hashCode);
+  const st = { mine: {}, others: new Map(), conns: new Map(), ok: false, id: null };
+  let peer = null;
+  const send = () => { const msg = JSON.stringify(st.mine); for (const c of st.conns.values()) if (c.open) { try { c.send(msg); } catch (e) { } } };
   const wire = c => {
-    c.on('open', () => { st.conns.add(c); send(); });
+    c.on('open', () => { st.conns.set(c.peer, c); if (c.peer.startsWith('veeran-')) addFriend(c.peer.slice(7)); room.err = null; send(); });
     c.on('data', d => { try { st.others.set(c.peer, Object.freeze(JSON.parse(d))); } catch (e) { } });
-    c.on('close', () => { st.conns.delete(c); st.others.delete(c.peer); });
+    c.on('close', () => { if (st.conns.get(c.peer) === c) st.conns.delete(c.peer); st.others.delete(c.peer); });
     c.on('error', () => { });
   };
+  const dialing = new Map();
+  const dialAll = () => {
+    if (!peer || !st.ok) return;
+    for (const f of friends) {
+      const id = 'veeran-' + f; const cur = st.conns.get(id);
+      if (cur && cur.open) continue;
+      if (dialing.has(id) && Date.now() - dialing.get(id) < 6000) continue;
+      dialing.set(id, Date.now());
+      try { wire(peer.connect(id, { serialization: 'json' })); } catch (e) { }
+    }
+  };
+  const start = id => {
+    peer = id ? new Peer(id) : new Peer();
+    peer.on('open', pid => { st.id = pid; st.ok = true; dialAll(); });
+    peer.on('connection', c => wire(c));
+    peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { } });
+    peer.on('error', e => {
+      room.err = e.type;
+      if (e.type === 'unavailable-id') { try { peer.destroy(); } catch (x) { } room.link = null; start(null); } // same game open in another tab
+    });
+  };
   const room = {
-    joinCode, err: null,
-    link: myCode ? location.origin + location.pathname + '?join=' + myCode + '#' + myCode : null,
+    joinCode: hashCode, err: null, myCode,
+    link: location.origin + location.pathname + '?join=' + myCode + '#' + myCode,
+    friends: () => friends,
     peers() { const a = [{ peer: st.id || 'me', sameTab: true, presence: st.mine }]; for (const [k, v] of st.others) a.push({ peer: k, sameTab: false, presence: v }); return a; },
     connected() { return st.ok; },
     presence(patch) { const m = Object.assign({}, st.mine); for (const k in patch) { if (patch[k] === null) delete m[k]; else m[k] = patch[k]; } st.mine = m; send(); return Promise.resolve(); }
   };
-  peer.on('open', id => { st.id = id; st.ok = true; if (joinCode) wire(peer.connect('veeran-' + joinCode, { serialization: 'json' })); });
-  peer.on('connection', c => wire(c));
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { } });
-  peer.on('error', e => { room.err = e.type; });
+  start('veeran-' + myCode);
+  setInterval(dialAll, 3000);
   return room;
 }
 NET.connect();

@@ -4,7 +4,7 @@ Contra-style run-and-gun Tamil warrior saga set in 1600 BCE — from Veeramaaran
 
 **Play:** open `index.html` (GitHub Pages).
 
-**Online 2 players (two laptops):** choose *Online*, press Space to host, press **C** to copy the link and send it to your friend. Your friend opens that link, chooses Online, presses Space to join.
+**Online 2 players (two laptops):** choose *Online* and press Space to host. Press **C** to copy your link and send it to your friend **once** — it never changes. After that first game, you both just open the game and choose Online; you find each other automatically.
 
 **Keys (both laptops):** ← → move · ↑ jump · Space shoot · ↓ crouch · hold ↑ (or X) to aim up
 Same-keyboard Player 2: A D move · W jump · F shoot · S crouch · E aim up
