@@ -259,11 +259,12 @@ class Player {
   reset(x) {
     this.x = x; this.y = GROUND_Y - 260; this.vx = 0; this.vy = 0; this.w = 24;
     this.face = 1; this.ground = false; this.inv = 2.5; this.dead = 0; this.weapon = this.weapon || 'arrow';
-    this.cd = 0; this.phase = 0; this.aim = { x: 1, y: 0 }; this.crouch = false; this.dropT = 0; this.shootT = 0; this.spin = 0;
+    this.cd = 0; this.phase = 0; this.aim = { x: 1, y: 0 }; this.crouch = false; this.dropT = 0; this.shootT = 0; this.spin = 0; this.fly = this.fly || 0;
   }
   get hb() {
-    const h = this.crouch ? 34 : (this.ground ? 64 : 40);
-    return { x: this.x - this.w / 2, y: this.y - h - (this.ground ? 0 : 12), w: this.w, h };
+    const fl = this.fly > 0;
+    const h = this.crouch ? 34 : (this.ground || fl ? 64 : 40);
+    return { x: this.x - this.w / 2, y: this.y - h - (this.ground || fl ? 0 : 12), w: this.w, h };
   }
   update(dt) {
     if (this.out) return;
@@ -287,19 +288,25 @@ class Player {
       if (inp.down && this.onPlat) { this.dropT = 0.25; this.ground = false; this.y += 3; }
       else { this.vy = -770; this.ground = false; AUDIO.sfx('jump'); burst(this.x, this.y, 6, { colors: ['#6a4a30', '#8a6a48'], g: 300, min: 20, max: 90, lmax: 0.4 }); }
     }
-    this.vy = Math.min(this.vy + 2000 * dt, 1300);
+    if (this.fly > 0) {
+      this.fly -= dt;
+      if (inp.jump) { this.vy = Math.max(this.vy - 3400 * dt, -430); if (Math.random() < 0.6) part({ x: this.x + rand(-10, 10), y: this.y - 10, vx: rand(-30, 30), vy: rand(80, 200), life: 0.4, max: 0.4, size: rand(2, 4), color: '#cfefff', add: true, g: 0 }); }
+      if (this.fly <= 0) G.banner = { ta: 'சிறகு மறைந்தது', en: 'Wings faded', t: 1.4, small: true };
+    }
+    this.vy = Math.min(this.vy + 2000 * dt, this.fly > 0 && !inp.down ? 420 : 1300);
+    if (this.fly > 0 && this.y < 115) { this.y = 115; this.vy = Math.max(this.vy, 0); }
     this.x += this.vx * dt;
     const py = this.y; this.y += this.vy * dt;
     collideWorld(this, py);
     if (G.boss && G.boss.block) this.x = Math.min(this.x, G.boss.block() - 14);
     this.x = clamp(this.x, G.cam + 16, G.cam + W - 16);
     if (this.ground && mx) this.phase += dt * 13; else if (this.ground) this.phase = 0;
-    if (!this.ground) this.spin += dt * 16 * this.face;
+    if (!this.ground && !(this.fly > 0)) this.spin += dt * 16 * this.face;
     if (this.y > H + 60) this.hurt(true);
     if (inp.fire && this.cd <= 0) this.shoot();
   }
   muzzle() {
-    const by = this.crouch ? 28 : this.ground ? 48 : 34;
+    const by = this.crouch ? 28 : this.ground || this.fly > 0 ? 48 : 34;
     return { x: this.x + this.aim.x * 30, y: this.y - by + this.aim.y * 24 };
   }
   shoot() {
@@ -315,14 +322,15 @@ class Player {
   hurt(pit) {
     if (this.dead > 0 || this.out) return;
     if (!pit && this.inv > 0) return;
-    this.lives--; this.dead = 1.5; this.vy = -500; this.weapon = 'arrow'; this.wlvl = 1; this.inv = 0;
+    this.lives--; this.fly = 0; this.dead = 1.5; this.vy = -500; this.weapon = 'arrow'; this.wlvl = 1; this.inv = 0;
     bloodBurst(this.x, this.y - 40, -this.face, 30); AUDIO.sfx('hurt'); G.shake = 12;
     if (pit) { this.dead = 0.6; this.vy = 0; this.y = H + 100; }
   }
   draw(c) {
     if (this.out) return;
     if (this.inv > 0 && this.dead <= 0 && Math.floor(G.t * 20) % 2) c.globalAlpha = 0.45;
-    const st = this.dead > 0 ? 'dead' : !this.ground ? 'roll' : this.crouch ? 'crouch' : this.vx ? 'run' : 'idle';
+    const st = this.dead > 0 ? 'dead' : !this.ground ? (this.fly > 0 ? 'idle' : 'roll') : this.crouch ? 'crouch' : this.vx ? 'run' : 'idle';
+    if (this.fly > 0 && this.dead <= 0) drawWings(c, this.x, this.y, G.t, this.face, this.fly);
     drawWarrior(c, this.x, this.y, {
       face: this.face, phase: this.phase, state: st, aim: this.aim, spin: this.spin, pal: this.i ? PAL.p2 : PAL.hero,
       weapon: 'bow', drawn: this.shootT > 0, deadT: 1.5 - this.dead, hero: true

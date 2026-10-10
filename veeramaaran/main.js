@@ -153,10 +153,11 @@ function updatePlay(dt) {
     for (const p of G.plats || []) {}
     for (const p of alivePlayers()) if (Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
       k.dead = true; AUDIO.sfx('pick');
-      if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }
+      if (k.kind === 'jet') { p.fly = 15; G.banner = { ta: 'கருடச் சிறகு!', en: 'Garuda wings: hold ↑ to fly', t: 2.2, small: true }; }
+      else if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }
       else if (p.weapon === k.kind) { p.wlvl = Math.min(3, (p.wlvl || 1) + 1); G.banner = { ta: `${WEAPONS[k.kind].ta} · சக்தி ${p.wlvl}`, en: `${WEAPONS[k.kind].en} power ${p.wlvl}`, t: 1.6, small: true }; }
       else { p.weapon = k.kind; p.wlvl = 1; G.banner = { ta: WEAPONS[k.kind].ta, en: WEAPONS[k.kind].en, t: 1.6, small: true }; }
-      burst(k.x, k.y, 20, { colors: [k.kind === 'life' ? '#ff6a5a' : WEAPONS[k.kind].col, '#fff'], g: -100, add: true, lmax: 0.6 });
+      burst(k.x, k.y, 20, { colors: [WEAPONS[k.kind] ? WEAPONS[k.kind].col : k.kind === 'jet' ? '#9fe3ff' : '#ff6a5a', '#fff'], g: -100, add: true, lmax: 0.6 });
     }
     if (k.t > 12 || k.y > H + 40 || k.x < G.cam - 40) k.dead = true;
   }
@@ -166,9 +167,9 @@ function updatePlay(dt) {
 }
 
 /* ===== Render ===== */
-const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச', life: 'உ' };
+const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச', life: 'உ', jet: 'சி' };
 function drawPickup(c, k) {
-  const w = WEAPONS[k.kind] || { col: '#ff5a4a' }, bob = Math.sin(k.t * 5) * 3;
+  const w = WEAPONS[k.kind] || { col: k.kind === 'jet' ? '#9fe3ff' : '#ff5a4a' }, bob = Math.sin(k.t * 5) * 3;
   c.save(); c.translate(k.x, k.y + bob);
   c.globalCompositeOperation = 'lighter';
   const g = c.createRadialGradient(0, 0, 2, 0, 0, 34); g.addColorStop(0, w.col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -192,6 +193,7 @@ function drawHUD(c) {
     }
     c.font = `600 13px ${BODY}`; c.fillStyle = WEAPONS[p.weapon].col;
     c.fillText(`${WEAPONS[p.weapon].ta} ${'★'.repeat(p.wlvl || 1)} · ${String(p.score).padStart(7, '0')}`, x, 82);
+    if (p.fly > 0) { c.fillStyle = '#9fe3ff'; c.fillText(`சிறகு ${Math.ceil(p.fly)}s · ↑ பற`, x, 100); }
     if (p.out) { c.fillStyle = '#a3221a'; c.fillText('வீழ்ந்தான்', x, 100); }
   });
   if (G.players.length < 2 && Math.floor(G.t * 1.5) % 2) {

@@ -239,7 +239,7 @@ function bossEmperor() {
       this.t += dt; this.stT -= dt; this.flash -= dt;
       const p = nearestPlayer(this.x) || { x: AL + 300, y: GROUND_Y };
       // arrow rain markers
-      for (const m of this.marks) { m.t -= dt; if (m.t <= 0 && !m.done) { m.done = true; for (let i = 0; i < 3; i++) eshoot(m.x + rand(-14, 14), -30 - i * 40, 0, 950, 'arrow', { burning: true }); } }
+      for (const m of this.marks) { m.t -= dt; if (m.t <= 0 && !m.done) { m.done = true; for (let i = 0; i < 3; i++) eshoot(m.x + rand(-14, 14), -30 - i * 40, 0, 950, 'arrow'); } }
       this.marks = this.marks.filter(m => m.t > -1);
       if (!this.p2 && this.hp <= this.max * 0.5) {
         this.p2 = true; this.wreck = { x: this.x, dir: this.dir }; fireBurst(this.x, this.y - 50, 80, 2); AUDIO.sfx('boom'); G.shake = 22; G.flash = 0.6;
@@ -264,19 +264,18 @@ function bossEmperor() {
         if (this.st !== 'dash' && this.st !== 'slam') this.face = p.x < this.x ? -1 : 1;
         if (this.st === 'stalk') { this.x += this.face * 130 * dt; this.phase += dt * 9; if (this.stT <= 0) { const r = Math.random(); this.go(r < 0.36 ? 'dash' : r < 0.7 ? 'slash' : 'slam', r < 0.36 ? 0.5 : 1.4); if (this.st === 'slam') { this.vy = -1000; this.vx = clamp((p.x - this.x) / 1.0, -560, 560); } } }
         else if (this.st === 'dash') {
-          if (this.stT > 0) { if (Math.random() < 0.5) fireBurst(this.x, this.y - 40, 2, 0.5); }
+          if (this.stT > 0) { if (Math.random() < 0.5) burst(this.x, this.y - 10, 2, { colors: ['#5a4030', '#3a2a1e'], g: 300, min: 20, max: 90, lmax: 0.4 }); }
           else {
             this.x += this.face * 780 * dt; this.phase += dt * 20;
-            if (((this.x / 70) | 0) !== this.lastTrail) { this.lastTrail = (this.x / 70) | 0; eshoot(this.x, GROUND_Y, 0, 0, 'flame', { life: 1.1, box: 'flame' }); }
             if (this.x < AL + 70 || this.x > AR - 70) { this.x = clamp(this.x, AL + 70, AR - 70); this.go('stalk', 0.9); }
           }
         } else if (this.st === 'slash') {
           this.attack = Math.min(1, this.attack + dt * 5);
-          if (this.n < 3 && this.stT < 1.2 - this.n * 0.4) { this.n++; this.attack = 0; eshoot(this.x + this.face * 30, GROUND_Y - 4, this.face * 540, 0, 'slash', { life: 2.2, box: 'slash' }); AUDIO.sfx('fire'); }
+          if (this.n < 3 && this.stT < 1.2 - this.n * 0.4) { this.n++; this.attack = 0; const tp = nearestPlayer(this.x) || { x: this.x + this.face * 300, y: GROUND_Y }; const a = Math.atan2(tp.y - 40 - (this.y - 110), tp.x - this.x); eshoot(this.x, this.y - 110, Math.cos(a) * 560, Math.sin(a) * 560, 'javelin'); AUDIO.sfx('shoot'); }
           if (this.stT <= 0) this.go('stalk', 1.0);
         } else if (this.st === 'slam') {
           this.vy += 2000 * dt; this.x += this.vx * dt; this.y += this.vy * dt;
-          if (this.y >= GROUND_Y && this.vy > 0) { this.y = GROUND_Y; G.shake = 16; AUDIO.sfx('boom'); fireBurst(this.x, GROUND_Y, 30); groundWave(this.x - 30, -1, 470); groundWave(this.x + 30, 1, 470); this.go('stalk', 1.1); }
+          if (this.y >= GROUND_Y && this.vy > 0) { this.y = GROUND_Y; G.shake = 16; AUDIO.sfx('boom'); burst(this.x, GROUND_Y, 30, { colors: ['#6a4a30', '#3a2a1e', '#8a6a48'], g: 700, min: 100, max: 380, vy: -200 }); groundWave(this.x - 30, -1, 470); groundWave(this.x + 30, 1, 470); this.go('stalk', 1.1); }
           this.x = clamp(this.x, AL + 50, AR - 50);
         }
       }
@@ -296,9 +295,9 @@ function bossEmperor() {
       if (this.wreck) { const w = this.wreck; c.fillStyle = '#140a06'; c.save(); c.translate(w.x, GROUND_Y); c.rotate(0.3); c.fillRect(-60, -40, 110, 40); c.restore(); drawFlame(c, w.x, GROUND_Y, 50, G.t, 4); drawFlame(c, w.x + 30, GROUND_Y, 34, G.t, 9); }
       if (this.p2) {
         c.save(); c.globalCompositeOperation = 'lighter';
-        const g = c.createRadialGradient(this.x, this.y - 50, 5, this.x, this.y - 50, 110); g.addColorStop(0, 'rgba(255,90,20,.5)'); g.addColorStop(1, 'rgba(255,40,0,0)');
+        const g = c.createRadialGradient(this.x, this.y - 50, 5, this.x, this.y - 50, 110); g.addColorStop(0, 'rgba(120,90,200,.35)'); g.addColorStop(1, 'rgba(60,40,120,0)');
         c.fillStyle = g; c.fillRect(this.x - 110, this.y - 160, 220, 200); c.restore();
-        drawWarrior(c, this.x, this.y, { scale: 1.55, face: this.face, phase: this.phase, state: this.st === 'stalk' || this.st === 'dash' ? 'run' : 'idle', pal: PAL.dark, weapon: 'fsword', attack: this.attack, flash: this.flash });
+        drawWarrior(c, this.x, this.y, { scale: 1.55, face: this.face, phase: this.phase, state: this.st === 'stalk' || this.st === 'dash' ? 'run' : 'idle', pal: PAL.dark, weapon: 'sword', attack: this.attack, flash: this.flash });
         return;
       }
       const d = this.dir, x = this.x, y = this.y;

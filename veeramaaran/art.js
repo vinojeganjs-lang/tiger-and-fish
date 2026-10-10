@@ -161,6 +161,25 @@ function drawWarrior(c, x, y, o) {
   c.restore();
 }
 
+/* ===== Garuda wings (flight power) ===== */
+function drawWings(c, x, y, t, face, left) {
+  const flap = Math.sin(t * 16) * 0.5, fade = left < 2 && Math.floor(t * 10) % 2 ? 0.35 : 1;
+  c.save(); c.translate(x - face * 4, y - 56); c.globalAlpha = fade;
+  const g = c.createRadialGradient(0, 0, 4, 0, 0, 70); g.addColorStop(0, 'rgba(255,240,190,.45)'); g.addColorStop(1, 'rgba(160,220,255,0)');
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = g; c.fillRect(-70, -70, 140, 140); c.globalCompositeOperation = 'source-over';
+  for (const side of [-1, 1]) {
+    c.save(); c.scale(side * -face, 1); c.rotate(-0.5 + flap * side * 0.3 + (side < 0 ? 0.1 : 0));
+    for (let i = 0; i < 6; i++) {
+      const a = -0.2 - i * 0.22, L = 52 - i * 4;
+      c.fillStyle = i % 2 ? '#e8b33a' : '#fff2c8';
+      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(Math.cos(a) * L * 0.6, Math.sin(a) * L * 0.6 - 10, Math.cos(a) * L, Math.sin(a) * L);
+      c.quadraticCurveTo(Math.cos(a) * L * 0.5 + 6, Math.sin(a) * L * 0.5 + 4, 0, 4); c.fill();
+    }
+    c.restore();
+  }
+  c.restore();
+}
+
 /* ===== Flames ===== */
 function drawFlame(c, x, y, sz, t, seed = 0) {
   if (!(sz > 1)) return;

@@ -133,8 +133,8 @@ function killEnemy(e, s) {
   const cx = e.x, cy = e.y - e.h / 2, dir = s ? Math.sign(s.vx) || 1 : 1;
   if (e.type === 'kite') {
     burst(cx, cy, 14, { colors: ['#2a1408', '#4a2a14'], g: 400, smin: 2, smax: 4, shape: 'shard' });
-    const lifeP = G.boss ? 0.3 : 0.18;
-    G.pickups.push({ x: cx, y: cy, vy: -200, kind: Math.random() < lifeP ? 'life' : ['fire', 'vel', 'chakra'][(Math.random() * 3) | 0], t: 0 });
+    const r = Math.random(), jetP = G.stage === 3 ? 0.35 : 0.2, lifeP = G.boss ? 0.25 : 0.15;
+    G.pickups.push({ x: cx, y: cy, vy: -200, kind: r < jetP ? 'jet' : r < jetP + lifeP ? 'life' : ['fire', 'vel', 'chakra'][(Math.random() * 3) | 0], t: 0 });
   } else if (e.type === 'catapult') { fireBurst(cx, cy, 40, 1.4); AUDIO.sfx('boom'); G.shake = 8; }
   else {
     bloodBurst(cx, cy - 10, dir, 22);
