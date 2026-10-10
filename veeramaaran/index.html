@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ta"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Veeramaaran - a Contra-style Tamil warrior saga, 1600 BCE. Online 2-player co-op.">
+<title>Veeramaaran</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arima+Madurai:wght@700;900&family=Hind+Madurai:wght@400;600&family=Cinzel:wght@600;900&display=swap">
+<style>
+/* Layout: one full-bleed 16:9 stage, letterboxed on black; touch pad overlays on phones */
+:root{
+  --void:#070302; --ember:#ff7a1f; --gold:#e8b33a; --ash:#d9c7a8; --blood:#8e1410;
+  --f-ta:"Arima Madurai","Hind Madurai","Noto Sans Tamil",serif;
+  --f-body:"Hind Madurai","Noto Sans Tamil",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--void);color:var(--ash);font-family:var(--f-body);overflow:hidden;
+  display:flex;align-items:center;justify-content:center;padding-inline:0;user-select:none;-webkit-user-select:none;touch-action:none}
+#wrap{position:relative;width:min(100vw,calc(100vh*16/9));width:min(100%,calc(100dvh*16/9));aspect-ratio:16/9;max-width:100%}
+#game{display:block;width:100%;height:100%;background:#000;image-rendering:auto}
+#touch{position:absolute;inset:0;pointer-events:none;display:none}
+@media (pointer:coarse){#touch{display:block}}
+.pad{position:absolute;pointer-events:auto;border-radius:50%;background:rgba(255,140,40,.10);border:2px solid rgba(255,170,80,.35);
+  display:flex;align-items:center;justify-content:center;color:rgba(255,220,170,.85);font:700 15px var(--f-ta)}
+#stick{left:3%;bottom:6%;width:23%;aspect-ratio:1}
+#stick .nub{width:38%;aspect-ratio:1;border-radius:50%;background:rgba(255,160,60,.45);transform:translate(var(--dx,0),var(--dy,0))}
+#bJump{right:15%;bottom:6%;width:12%;aspect-ratio:1}
+#bFire{right:2.5%;bottom:18%;width:12%;aspect-ratio:1;background:rgba(200,40,20,.25)}
+#bStart{right:2.5%;top:3%;width:7%;aspect-ratio:1;font-size:11px}
+button:focus-visible{outline:2px solid var(--gold)}
+</style>
+</head><body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540" aria-label="Veeramaaran game"></canvas>
+  <div id="touch">
+    <div class="pad" id="stick"><div class="nub"></div></div>
+    <div class="pad" id="bJump">தாவு</div>
+    <div class="pad" id="bFire">எய்</div>
+    <div class="pad" id="bStart">❚❚</div>
+  </div>
+</div>
+<script src="../peerjs.min.js"></script>
+<script src="engine.js" charset="utf-8"></script>
+<script src="art.js" charset="utf-8"></script>
+<script src="enemies.js" charset="utf-8"></script>
+<script src="bosses.js" charset="utf-8"></script>
+<script src="story.js" charset="utf-8"></script>
+<script src="net.js" charset="utf-8"></script>
+<script src="main.js" charset="utf-8"></script>
+
+</body></html>
