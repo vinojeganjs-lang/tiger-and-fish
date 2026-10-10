@@ -77,12 +77,15 @@ const ETYPES = {
     draw(c, e) {
       c.save(); c.translate(e.x, e.y - 20); if (e.flash > 0) c.filter = 'brightness(2.4)';
       const fl = Math.sin(e.t * 12) * 16;
-      c.fillStyle = '#2a1408';
-      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-20, -10 - fl, -46, -6 - fl); c.lineTo(-10, 6); c.fill();
-      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(20, -10 - fl, 46, -6 - fl); c.lineTo(10, 6); c.fill();
-      c.fillStyle = '#4a2a14'; c.beginPath(); c.ellipse(0, 2, 14, 7, 0, 0, 6.283); c.fill();
-      c.fillStyle = '#efe2c4'; c.beginPath(); c.arc(-14, -1, 5, 0, 6.283); c.fill();
-      c.fillStyle = '#e8b33a'; c.beginPath(); c.moveTo(-18, 0); c.lineTo(-24, 2); c.lineTo(-18, 3); c.fill();
+      c.fillStyle = '#0c0a10';
+      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-20, -10 - fl, -48, -4 - fl); c.lineTo(-40, -1 - fl * 0.6); c.lineTo(-44, 3 - fl * 0.4); c.lineTo(-10, 6); c.fill();
+      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(20, -10 - fl, 48, -4 - fl); c.lineTo(40, -1 - fl * 0.6); c.lineTo(44, 3 - fl * 0.4); c.lineTo(10, 6); c.fill();
+      c.fillStyle = '#16141c'; c.beginPath(); c.ellipse(0, 2, 15, 7, 0, 0, 6.283); c.fill();
+      c.beginPath(); c.moveTo(12, 0); c.lineTo(24, -3); c.lineTo(24, 6); c.fill();
+      c.fillStyle = '#3a3a46'; c.beginPath(); c.arc(-14, -1, 6, 0, 6.283); c.fill();
+      c.fillStyle = '#5a5a66'; c.beginPath(); c.moveTo(-19, -2); c.lineTo(-28, 1); c.lineTo(-19, 3); c.fill();
+      c.fillStyle = '#ff3a1a'; c.beginPath(); c.arc(-16, -2, 1.4, 0, 6.283); c.fill();
+      c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,200,90,.35)'; c.beginPath(); c.arc(0, 28, 16 + Math.sin(e.t * 8) * 3, 0, 6.283); c.fill(); c.globalCompositeOperation = 'source-over';
       // carried pot with glyph
       seg(c, 0, 8, 0, 18, 1.5, '#1a0c06');
       c.fillStyle = '#8a3a14'; c.beginPath(); c.arc(0, 28, 11, 0, 6.283); c.fill();
@@ -130,7 +133,8 @@ function killEnemy(e, s) {
   const cx = e.x, cy = e.y - e.h / 2, dir = s ? Math.sign(s.vx) || 1 : 1;
   if (e.type === 'kite') {
     burst(cx, cy, 14, { colors: ['#2a1408', '#4a2a14'], g: 400, smin: 2, smax: 4, shape: 'shard' });
-    G.pickups.push({ x: cx, y: cy, vy: -200, kind: ['fire', 'vel', 'chakra'][(Math.random() * 3) | 0], t: 0 });
+    const lifeP = G.boss ? 0.3 : 0.18;
+    G.pickups.push({ x: cx, y: cy, vy: -200, kind: Math.random() < lifeP ? 'life' : ['fire', 'vel', 'chakra'][(Math.random() * 3) | 0], t: 0 });
   } else if (e.type === 'catapult') { fireBurst(cx, cy, 40, 1.4); AUDIO.sfx('boom'); G.shake = 8; }
   else {
     bloodBurst(cx, cy - 10, dir, 22);

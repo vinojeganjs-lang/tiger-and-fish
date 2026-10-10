@@ -303,19 +303,19 @@ class Player {
     return { x: this.x + this.aim.x * 30, y: this.y - by + this.aim.y * 24 };
   }
   shoot() {
-    const w = WEAPONS[this.weapon]; this.cd = w.cd; this.shootT = 0.12;
+    const w = WEAPONS[this.weapon], lv = this.wlvl || 1; this.cd = w.cd * (1 - 0.15 * (lv - 1)); this.shootT = 0.12;
     const m = this.muzzle(), base = Math.atan2(this.aim.y, this.aim.x);
-    const spreads = w.spread ? [-0.24, -0.12, 0, 0.12, 0.24] : [0];
+    const spreads = w.spread ? (lv >= 3 ? [-0.36, -0.24, -0.12, 0, 0.12, 0.24, 0.36] : [-0.24, -0.12, 0, 0.12, 0.24]) : lv >= 2 && !w.pierce ? [-0.05, 0.05] : [0];
     for (const da of spreads) {
       const a = base + da;
-      G.shots.push({ x: m.x, y: m.y, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, dmg: w.dmg, pierce: !!w.pierce, kind: this.weapon, life: 1.1, owner: this, hit: new Set(), rot: 0 });
+      G.shots.push({ x: m.x, y: m.y, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, dmg: w.dmg * (1 + 0.5 * (lv - 1)), pierce: !!w.pierce, kind: this.weapon, life: 1.1, owner: this, hit: new Set(), rot: 0 });
     }
     AUDIO.sfx(this.weapon === 'vel' ? 'vel' : this.weapon === 'fire' ? 'fire' : 'shoot');
   }
   hurt(pit) {
     if (this.dead > 0 || this.out) return;
     if (!pit && this.inv > 0) return;
-    this.lives--; this.dead = 1.5; this.vy = -500; this.weapon = 'arrow'; this.inv = 0;
+    this.lives--; this.dead = 1.5; this.vy = -500; this.weapon = 'arrow'; this.wlvl = 1; this.inv = 0;
     bloodBurst(this.x, this.y - 40, -this.face, 30); AUDIO.sfx('hurt'); G.shake = 12;
     if (pit) { this.dead = 0.6; this.vy = 0; this.y = H + 100; }
   }

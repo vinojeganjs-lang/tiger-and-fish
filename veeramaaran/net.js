@@ -2,7 +2,7 @@
 /* ===== Online co-op over the artifact "room" (presence channel) =====
    Host laptop runs the whole game and publishes a compact snapshot in its presence ~20×/s.
    Guest laptop sends its keys in its own presence and draws the host's snapshots. */
-const WK = ['arrow', 'fire', 'vel', 'chakra'];
+const WK = ['arrow', 'fire', 'vel', 'chakra', 'life'];
 const ETK = ['soldier', 'archer', 'boar', 'kite', 'catapult'];
 const EWK = ['sword', 'spear', 'bow', 'axe'];
 const ESK = ['arrow', 'spear', 'javelin', 'axe', 'pot', 'fireball', 'wave', 'slash', 'flame'];
@@ -118,7 +118,7 @@ const NET = {
   snapshot() {
     const s = { m: G.state, st: G.stage, c: r0(G.cam), sh: r0(G.shake), fl: r2(G.flash), pa: G.paused ? 1 : 0, mu: AUDIO.wanted || 0, go: r1(G.goT) };
     if (G.state === 'scene') { s.sc = G.sq[G.si]; s.t = r2(G.st); }
-    s.p = G.players.map(p => [r0(p.x), r0(p.y), p.face, r1(p.phase), p.ground ? 1 : 0, p.crouch ? 1 : 0, r0(p.vx), r2(p.aim.x), r2(p.aim.y), r1(p.spin), r1(p.inv), r2(p.dead), p.out ? 1 : 0, p.lives, p.score, WK.indexOf(p.weapon), p.shootT > 0 ? 1 : 0, r0(p.vy)]);
+    s.p = G.players.map(p => [r0(p.x), r0(p.y), p.face, r1(p.phase), p.ground ? 1 : 0, p.crouch ? 1 : 0, r0(p.vx), r2(p.aim.x), r2(p.aim.y), r1(p.spin), r1(p.inv), r2(p.dead), p.out ? 1 : 0, p.lives, p.score, WK.indexOf(p.weapon), p.shootT > 0 ? 1 : 0, r0(p.vy), p.wlvl || 1]);
     if (G.state === 'play' || G.state === 'gameover') {
       s.e = G.enemies.slice(0, 22).map(e => [e.id, ETK.indexOf(e.type), r0(e.x), r0(e.y), e.dir || -1, r0(e.vx), e.flash > 0 ? 1 : 0, EWK.indexOf(e.weapon || 'sword'), r1(e.attack), e.aim ? r2(e.aim.x) : 0, e.aim ? r2(e.aim.y) : 0, r1(e.cool), r1(e.arm), r1(e.t), e.ground ? 1 : 0]);
       s.s = G.shots.slice(0, 28).map(q => [r0(q.x), r0(q.y), r0(q.vx), r0(q.vy), WK.indexOf(q.kind)]);
@@ -171,7 +171,7 @@ const NET = {
     if (s.m === 'scene') { if (G.sceneName !== s.sc) { G.sceneName = s.sc; G.scene = SCENES[s.sc]; G.st = s.t; } else if (Math.abs(G.st - s.t) > 0.35) G.st = s.t; }
     else G.sceneName = null;
     while (G.players.length < s.p.length) G.players.push(new Player(G.players.length));
-    s.p.forEach((a, i) => Object.assign(G.players[i], { x: a[0], y: a[1], face: a[2], phase: a[3], ground: !!a[4], crouch: !!a[5], vx: a[6], aim: { x: a[7], y: a[8] }, spin: a[9], inv: a[10], dead: a[11], out: !!a[12], lives: a[13], score: a[14], weapon: WK[a[15]] || 'arrow', shootT: a[16] ? 0.1 : 0, vy: a[17] }));
+    s.p.forEach((a, i) => Object.assign(G.players[i], { x: a[0], y: a[1], face: a[2], phase: a[3], ground: !!a[4], crouch: !!a[5], vx: a[6], aim: { x: a[7], y: a[8] }, spin: a[9], inv: a[10], dead: a[11], out: !!a[12], lives: a[13], score: a[14], weapon: WK[a[15]] || 'arrow', shootT: a[16] ? 0.1 : 0, vy: a[17], wlvl: a[18] || 1 }));
     if (live) {
       const nm = new Map();
       G.enemies = (s.e || []).map(a => {

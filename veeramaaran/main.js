@@ -14,7 +14,7 @@ function buildLevel(i) {
   if (i !== 2) L.plats.push({ x: L.bossX + 190, y: GROUND_Y - 150, w: 150 }, { x: L.bossX + 450, y: GROUND_Y - 150, w: 140 });
   for (const p of L.plats) if (p.x < L.bossX - 250 && r() < 0.5) L.spawns.push({ x: p.x + p.w / 2, y: p.y, type: 'archer' });
   for (let sx = 1150; sx < L.bossX - 600; sx += 800 + r() * 700) L.spawns.push({ x: sx, y: GROUND_Y, type: i >= 2 && r() < 0.55 ? 'catapult' : 'boar' });
-  [900, 2700, 4500].forEach(sx => L.spawns.push({ x: sx, y: 150, type: 'kite' }));
+  for (let sx = 650; sx < L.bossX - 200; sx += 650 + r() * 350) L.spawns.push({ x: sx, y: 150, type: 'kite' });
   L.spawns.sort((a, b) => a.x - b.x);
   return L;
 }
@@ -30,7 +30,7 @@ function startGame(n, stage = 0) {
 }
 function startStage(i) {
   G.stage = i; G.level = buildLevel(i); G.cam = 0; G.boss = null; G.clearT = 0; G.bossGone = false;
-  G.enemies = []; G.shots = []; G.eshots = []; G.parts = []; G.pickups = []; G.spawnT = 2.5; G.slow = 1;
+  G.enemies = []; G.shots = []; G.eshots = []; G.parts = []; G.pickups = []; G.spawnT = 2.5; G.slow = 1; G.crowT = 4;
   G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.weapon = p.weapon || 'arrow'; p.reset(120 + k * 70); });
   G.state = 'play'; AUDIO.music('battle');
   G.banner = { ta: STAGE_NAMES[i][0], en: STAGE_NAMES[i][1], t: 3 };
@@ -90,6 +90,10 @@ function updatePlay(dt) {
     const side = Math.random() < 0.22 ? -1 : 1, n = 1 + ((Math.random() * (G.stage >= 2 ? 3 : 2)) | 0);
     for (let k = 0; k < n; k++) { const x = side > 0 ? G.cam + W + 30 + k * 40 : G.cam - 30 - k * 40; if (groundAt(x)) spawnEnemy('soldier', x, GROUND_Y - 4); }
   }
+  if (G.boss && !G.clearT) {
+    G.crowT = (G.crowT ?? 4) - dt;
+    if (G.crowT <= 0) { G.crowT = G.stage === 3 ? 7 : 10; spawnEnemy('kite', G.cam + W + 40, 150); }
+  }
   updateEnemies(dt);
   if (G.boss && !G.bossGone) {
     if (!G.clearT) G.boss.update(dt);
@@ -148,8 +152,11 @@ function updatePlay(dt) {
     if (k.y >= GROUND_Y - 14 && groundAt(k.x)) { k.y = GROUND_Y - 14; k.vy = 0; }
     for (const p of G.plats || []) {}
     for (const p of alivePlayers()) if (Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
-      k.dead = true; p.weapon = k.kind; AUDIO.sfx('pick'); G.banner = { ta: WEAPONS[k.kind].ta, en: WEAPONS[k.kind].en, t: 1.6, small: true };
-      burst(k.x, k.y, 20, { colors: [WEAPONS[k.kind].col, '#fff'], g: -100, add: true, lmax: 0.6 });
+      k.dead = true; AUDIO.sfx('pick');
+      if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }
+      else if (p.weapon === k.kind) { p.wlvl = Math.min(3, (p.wlvl || 1) + 1); G.banner = { ta: `${WEAPONS[k.kind].ta} · சக்தி ${p.wlvl}`, en: `${WEAPONS[k.kind].en} power ${p.wlvl}`, t: 1.6, small: true }; }
+      else { p.weapon = k.kind; p.wlvl = 1; G.banner = { ta: WEAPONS[k.kind].ta, en: WEAPONS[k.kind].en, t: 1.6, small: true }; }
+      burst(k.x, k.y, 20, { colors: [k.kind === 'life' ? '#ff6a5a' : WEAPONS[k.kind].col, '#fff'], g: -100, add: true, lmax: 0.6 });
     }
     if (k.t > 12 || k.y > H + 40 || k.x < G.cam - 40) k.dead = true;
   }
@@ -159,9 +166,9 @@ function updatePlay(dt) {
 }
 
 /* ===== Render ===== */
-const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச' };
+const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச', life: 'உ' };
 function drawPickup(c, k) {
-  const w = WEAPONS[k.kind], bob = Math.sin(k.t * 5) * 3;
+  const w = WEAPONS[k.kind] || { col: '#ff5a4a' }, bob = Math.sin(k.t * 5) * 3;
   c.save(); c.translate(k.x, k.y + bob);
   c.globalCompositeOperation = 'lighter';
   const g = c.createRadialGradient(0, 0, 2, 0, 0, 34); g.addColorStop(0, w.col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -184,7 +191,7 @@ function drawHUD(c) {
       seg(c, lx, 44, lx, 62, 2, '#6a4220'); c.fillStyle = '#ffe08a'; c.beginPath(); c.moveTo(lx, 40); c.lineTo(lx + 3.5, 47); c.lineTo(lx - 3.5, 47); c.fill();
     }
     c.font = `600 13px ${BODY}`; c.fillStyle = WEAPONS[p.weapon].col;
-    c.fillText(`${WEAPONS[p.weapon].ta} · ${String(p.score).padStart(7, '0')}`, x, 82);
+    c.fillText(`${WEAPONS[p.weapon].ta} ${'★'.repeat(p.wlvl || 1)} · ${String(p.score).padStart(7, '0')}`, x, 82);
     if (p.out) { c.fillStyle = '#a3221a'; c.fillText('வீழ்ந்தான்', x, 100); }
   });
   if (G.players.length < 2 && Math.floor(G.t * 1.5) % 2) {
