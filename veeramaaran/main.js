@@ -43,7 +43,7 @@ function startStage(i) {
   SAVE.reach(i);
   G.stage = i; G.level = buildLevel(i); G.cam = 0; G.boss = null; G.clearT = 0; G.bossGone = false;
   G.enemies = []; G.shots = []; G.eshots = []; G.parts = []; G.pickups = []; G.spawnT = 2.5; G.slow = 1; G.crowT = 4;
-  G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.arms = p.arms || {}; p.reset(120 + k * 70); });
+  G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.arms = {}; p.cds = {}; p.fly = 0; p.reset(120 + k * 70); });
   G.state = 'play'; AUDIO.music('battle');
   G.banner = { ta: STAGE_NAMES[i][0], en: STAGE_NAMES[i][1], t: 3 };
 }
