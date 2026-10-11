@@ -377,7 +377,7 @@ function botInput(b) {
   if (G.boss && !G.bossGone) { const bb = G.boss.body().filter(Boolean)[0]; if (bb && want > bb.x - 110) want = bb.x - 110; }
   // walk over to grab a power-up lying close by
   let near = null;
-  for (const k of G.pickups) if (k.y > GROUND_Y - 60 && Math.abs(k.x - b.x) < 320 && k.x > G.cam + 20 && k.x < G.cam + W - 20 && (!near || Math.abs(k.x - b.x) < Math.abs(near.x - b.x))) near = k;
+  for (const k of G.pickups) if (k.y > GROUND_Y - 260 && Math.abs(k.x - b.x) < 420 && k.x > G.cam + 20 && k.x < G.cam + W - 20 && (!near || Math.abs(k.x - b.x) < Math.abs(near.x - b.x))) near = k;
   if (near) want = near.x;
   want = clamp(want, G.cam + 40, G.cam + W - 60);
   const tol = near ? 8 : 30;
