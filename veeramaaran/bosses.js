@@ -611,9 +611,11 @@ function bossTwins() {
     }
   });
 }
+const BOSS_EASE = 0.7, BOSS_TEMPO = 0.8;
 const BOSSES = [bossChief, bossShip, bossScorpion, bossTiger, bossElephant, bossTower, bossTwins, bossEmperor];
 function makeBoss(i) {
-  const b = BOSSES[i](); const mult = 1 + 0.5 * (G.nPlayers - 1);
+  // BOSS_EASE: every chapter's final boss has 30% less life (and BOSS_TEMPO slows its attacks)
+  const b = BOSSES[i](); const mult = (1 + 0.5 * (G.nPlayers - 1)) * BOSS_EASE;
   if (b.scale) b.scale(mult);
   else if (b.parts) { b.parts.forEach(q => q.hp = Math.round(q.hp * mult)); b.hp = b.parts.reduce((s, q) => s + q.hp, 0); }
   else b.hp = Math.round(b.hp * mult);

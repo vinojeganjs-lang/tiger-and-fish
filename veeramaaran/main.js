@@ -108,7 +108,7 @@ function updatePlay(dt) {
   }
   updateEnemies(dt);
   if (G.boss && !G.bossGone) {
-    if (!G.clearT) G.boss.update(dt);
+    if (!G.clearT) G.boss.update(dt * BOSS_TEMPO);
     if (!G.clearT && G.boss.hp <= 0) onBossDown();
   }
   if (G.clearT) {
