@@ -396,6 +396,17 @@ function drawShot(c, s) {
     seg(c, -40, 0, 14, 0, 3.5, '#6a4220');
     c.fillStyle = '#ffe08a'; c.beginPath(); c.moveTo(30, 0); c.quadraticCurveTo(16, -9, 8, -2); c.lineTo(8, 2); c.quadraticCurveTo(16, 9, 30, 0); c.fill();
     c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,220,120,.35)'; c.beginPath(); c.ellipse(14, 0, 22, 10, 0, 0, 6.283); c.fill();
+  } else if (s.kind === 'bomb') {
+    c.rotate((s.rot || G.t * 10) - a);
+    c.fillStyle = '#6a3014'; c.beginPath(); c.arc(0, 2, 9, 0, 6.283); c.fill();
+    c.fillStyle = '#9a4a20'; c.beginPath(); c.arc(-3, -1, 4, 0, 6.283); c.fill();
+    c.fillStyle = '#4a200c'; c.fillRect(-3, -11, 6, 6);
+    c.fillStyle = '#e8b33a'; c.fillRect(-9, 1, 18, 2);
+    drawFlame(c, 0, -11, 9, G.t, s.x);
+  } else if (s.kind === 'blaze') {
+    c.rotate(-a);
+    const k = s.max ? clamp(s.life / s.max, 0, 1) : 1;
+    drawFlame(c, 0, 0, 30 * (0.45 + 0.55 * Math.min(1, k * 2)), G.t, s.x);
   } else if (s.kind === 'chakra') {
     c.rotate(G.t * 30); c.strokeStyle = '#9fe3ff'; c.lineWidth = 2.5; c.beginPath(); c.arc(0, 0, 7, 0, 6.283); c.stroke();
     c.fillStyle = '#e8fbff'; for (let i = 0; i < 6; i++) { c.rotate(1.047); c.fillRect(6, -1.5, 5, 3); }

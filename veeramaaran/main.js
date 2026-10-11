@@ -33,6 +33,7 @@ const SAVE = {
 };
 function startGame(n, stage = 0, pick = true) {
   G.nPlayers = n; G.players = [new Player(0)]; if (n === 2) G.players.push(new Player(1));
+  if (n === 1 && NET.mode !== 'host') { const bot = new Player(1); bot.bot = true; G.players.push(bot); }
   if (pick && stage === 0 && SAVE.get().ch > 0) { G.state = 'chapters'; G.chSel = SAVE.get().ch; G.chT = 0; return; }
   if (stage > 0) { startStage(stage); return; }
   runScenes(['birth', 'youth', 'ch1'], () => startStage(0));
@@ -41,7 +42,7 @@ function startStage(i) {
   SAVE.reach(i);
   G.stage = i; G.level = buildLevel(i); G.cam = 0; G.boss = null; G.clearT = 0; G.bossGone = false;
   G.enemies = []; G.shots = []; G.eshots = []; G.parts = []; G.pickups = []; G.spawnT = 2.5; G.slow = 1; G.crowT = 4;
-  G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.weapon = p.weapon || 'arrow'; p.reset(120 + k * 70); });
+  G.players.forEach((p, k) => { if (p.out) { p.out = false; p.lives = 3; } p.arms = p.arms || {}; p.reset(120 + k * 70); });
   G.state = 'play'; AUDIO.music('battle');
   G.banner = { ta: STAGE_NAMES[i][0], en: STAGE_NAMES[i][1], t: 3 };
 }
@@ -74,7 +75,7 @@ function updatePlay(dt) {
   const L = G.level;
   if (G.togglePause || pressed.Escape || pressed.KeyP || (padState[0] && padState[0].startP)) { G.togglePause = false; G.paused = !G.paused; }
   if (G.paused) return;
-  if (G.players.length < 2 && NET.mode !== 'host' && p2JoinPressed()) { const p = new Player(1); p.reset(G.cam + 100); G.players.push(p); G.nPlayers = 2; G.banner = { ta: 'செங்கன் இணைந்தான்!', en: 'Sengan joins the fight', t: 2 }; }
+  if ((G.players.length < 2 || G.players[1].bot) && NET.mode !== 'host' && p2JoinPressed()) { if (G.players[1]) G.players[1].bot = false; else { const p = new Player(1); p.reset(G.cam + 100); G.players.push(p); } G.nPlayers = 2; G.banner = { ta: 'செங்கன் இணைந்தான்!', en: 'Sengan joins the fight', t: 2 }; }
   G.players.forEach(p => p.update(dt));
   const alive = alivePlayers();
   if (alive.length && !G.boss) {
@@ -117,21 +118,29 @@ function updatePlay(dt) {
   }
   // player shots
   for (const s of G.shots) {
-    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-    if (s.x < G.cam - 40 || s.x > G.cam + W + 40 || s.y < -40 || s.y > H + 20) s.dead = true;
-    if (s.y > GROUND_Y + 2 && groundAt(s.x)) { s.dead = true; sparks(s.x, GROUND_Y); }
     if (s.dead) continue;
-    const sb = { x: s.x - 7, y: s.y - 7, w: 14, h: 14 };
+    if (s.kind === 'bomb') { s.vy += 1150 * dt; s.rot = (s.rot || 0) + dt * 10; }
+    const py = s.y;
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+    if (s.kind === 'blaze') { s.tick -= dt; if (s.tick <= 0) { s.tick = 0.3; s.hit.clear(); } }
+    if (s.x < G.cam - 40 || s.x > G.cam + W + 40 || (s.y < -40 && s.kind !== 'bomb') || s.y > H + 20) s.dead = true;
+    if (s.kind === 'bomb' && s.vy > 0) for (const pl of G.level.plats) if (s.x >= pl.x && s.x <= pl.x + pl.w && py <= pl.y && s.y >= pl.y) { explodeBomb(s, pl.y); break; }
+    if (!s.dead && s.y > GROUND_Y + 2 && groundAt(s.x)) { if (s.kind === 'bomb') explodeBomb(s, GROUND_Y); else { s.dead = true; sparks(s.x, GROUND_Y); } }
+    if (s.dead) continue;
+    const sb = s.kind === 'blaze' ? { x: s.x - 24, y: s.y - 56, w: 48, h: 56 } : s.kind === 'bomb' ? { x: s.x - 10, y: s.y - 10, w: 20, h: 20 } : { x: s.x - 7, y: s.y - 7, w: 14, h: 14 };
     for (const e of G.enemies) {
       if (e.dead || s.hit.has(e) || !overlap(sb, ehb(e))) continue;
-      s.hit.add(e); e.hp -= s.dmg; e.flash = 0.06; sparks(s.x, s.y); AUDIO.sfx('hit');
-      if (s.kind === 'fire') fireBurst(s.x, s.y, 6, 0.5);
+      if (s.kind === 'bomb') { explodeBomb(s); break; }
+      s.hit.add(e); e.hp -= s.dmg; e.flash = 0.06;
+      if (s.kind !== 'blaze') { sparks(s.x, s.y); AUDIO.sfx('hit'); }
+      if (s.kind === 'fire' || s.kind === 'blaze') fireBurst(s.x, s.y - (s.kind === 'blaze' ? 30 : 0), 6, 0.5);
       if (e.hp <= 0) killEnemy(e, s);
       if (!s.pierce) { s.dead = true; break; }
     }
     if (!s.dead && G.boss && !G.clearT && !G.bossGone) {
       G.boss.boxes().forEach((b, i) => {
         if (s.dead || !b || s.hit.has('b' + i) || !overlap(sb, b)) return;
+        if (s.kind === 'bomb') { explodeBomb(s); return; }
         s.hit.add('b' + i); G.boss.damage(s.dmg, i); sparks(s.x, s.y, '#ff9a50'); AUDIO.sfx('hit');
         if (Math.random() < 0.4) bloodBurst(s.x, s.y, Math.sign(s.vx), 5);
         if (!s.pierce) s.dead = true;
@@ -161,23 +170,42 @@ function updatePlay(dt) {
     k.t += dt; k.vy = Math.min(k.vy + 900 * dt, 500); const py = k.y; k.y += k.vy * dt;
     if (k.y >= GROUND_Y - 14 && groundAt(k.x)) { k.y = GROUND_Y - 14; k.vy = 0; }
     for (const p of G.plats || []) {}
-    for (const p of alivePlayers()) if (Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
+    for (const p of alivePlayers()) if (!p.bot && Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
       k.dead = true; AUDIO.sfx('pick');
       if (k.kind === 'jet') { p.fly = 15; G.banner = { ta: 'கருடச் சிறகு!', en: 'Garuda wings: hold ↑ to fly', t: 2.2, small: true }; }
       else if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }
-      else if (p.weapon === k.kind) { p.wlvl = Math.min(3, (p.wlvl || 1) + 1); G.banner = { ta: `${WEAPONS[k.kind].ta} · சக்தி ${p.wlvl}`, en: `${WEAPONS[k.kind].en} power ${p.wlvl}`, t: 1.6, small: true }; }
-      else { p.weapon = k.kind; p.wlvl = 1; G.banner = { ta: WEAPONS[k.kind].ta, en: WEAPONS[k.kind].en, t: 1.6, small: true }; }
+      else if (p.arms[k.kind]) { p.arms[k.kind] = Math.min(3, p.arms[k.kind] + 1); G.banner = { ta: `${WEAPONS[k.kind].ta} · சக்தி ${p.arms[k.kind]}`, en: `${WEAPONS[k.kind].en} power ${p.arms[k.kind]}`, t: 1.6, small: true }; }
+      else { p.arms[k.kind] = 1; G.banner = { ta: `+ ${WEAPONS[k.kind].ta}`, en: `${WEAPONS[k.kind].en} added · all powers fire together`, t: 1.8, small: true }; }
       burst(k.x, k.y, 20, { colors: [WEAPONS[k.kind] ? WEAPONS[k.kind].col : k.kind === 'jet' ? '#9fe3ff' : '#ff6a5a', '#fff'], g: -100, add: true, lmax: 0.6 });
     }
     if (k.t > 12 || k.y > H + 40 || k.x < G.cam - 40) k.dead = true;
   }
   G.pickups = G.pickups.filter(k => !k.dead);
   updateParts(dt);
-  if (G.players.every(p => p.out)) { G.state = 'gameover'; G.goT = 0; AUDIO.music(null); }
+  if (G.players.filter(p => !p.bot).every(p => p.out)) { G.state = 'gameover'; G.goT = 0; AUDIO.music(null); }
+}
+
+/* Fire pot bomb: bursts, burns everything near it, and leaves flames on the ground for a few seconds */
+function explodeBomb(s, gy) {
+  if (s.dead) return; s.dead = true;
+  const lv = s.lv || 1, y = gy ?? s.y, R = 80 + lv * 15;
+  fireBurst(s.x, y, 40 + lv * 10, 1.2 + lv * 0.2); AUDIO.sfx('boom'); G.shake = Math.max(G.shake, 6);
+  for (let i = 0; i < 6; i++) part({ x: s.x, y: y - 6, vx: rand(-220, 220), vy: rand(-380, -160), life: 0.8, max: 0.8, size: rand(2, 4), color: '#c9e4ee', g: 1100, shape: 'shard', vr: rand(-14, 14) });
+  for (const e of G.enemies) {
+    if (e.dead) continue;
+    if (Math.abs(e.x - s.x) < R && Math.abs((e.y - e.h / 2) - y) < R) { e.hp -= s.dmg; e.flash = 0.08; if (e.hp <= 0) killEnemy(e, { owner: s.owner, kind: 'fire', vx: e.x - s.x }); }
+  }
+  if (G.boss && !G.clearT && !G.bossGone) G.boss.boxes().forEach((b, i) => { if (b && s.x > b.x - R && s.x < b.x + b.w + R && y > b.y - R && y < b.y + b.h + R) G.boss.damage(s.dmg, i); });
+  const onGround = Math.abs(y - GROUND_Y) < 4, n = lv >= 3 ? 5 : 3;
+  for (let k = 0; k < n; k++) {
+    const bx = s.x + (k - (n - 1) / 2) * 42;
+    if (onGround ? groundAt(bx) : k === (n - 1) / 2) G.shots.push({ x: bx, y: y - 2, vx: 0, vy: 0, dmg: 0.6 + 0.3 * lv, pierce: true, kind: 'blaze', life: 2.4 + lv * 0.4, max: 2.4 + lv * 0.4, tick: 0, owner: s.owner, hit: new Set() });
+  }
 }
 
 /* ===== Render ===== */
-const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச', life: 'உ', jet: 'சி' };
+const GLYPH = { fire: 'நெ', vel: 'வே', chakra: 'ச', life: 'உ', jet: 'சி', bomb: 'கு' };
+const SHORT = { fire: 'நெருப்பு', vel: 'வேல்', chakra: 'சக்கரம்', bomb: 'குடுவை' };
 function drawPickup(c, k) {
   const w = WEAPONS[k.kind] || { col: k.kind === 'jet' ? '#9fe3ff' : '#ff5a4a' }, bob = Math.sin(k.t * 5) * 3;
   c.save(); c.translate(k.x, k.y + bob);
@@ -195,18 +223,19 @@ function drawHUD(c) {
     const right = i === 1, x = right ? W - 20 : 20;
     c.textAlign = right ? 'right' : 'left';
     c.font = `700 19px ${TA}`; c.fillStyle = i ? '#9fb8ff' : '#ffcf80'; c.shadowColor = '#000'; c.shadowBlur = 6;
-    c.fillText(PNAMES[i].ta, x, 34);
+    c.fillText(PNAMES[i].ta + (p.bot ? ' · துணை' : ''), x, 34);
     c.shadowBlur = 0;
-    for (let l = 0; l < Math.max(0, p.lives); l++) {
+    for (let l = 0; l < (p.bot ? 0 : Math.max(0, p.lives)); l++) {
       const lx = right ? x - 6 - l * 13 : x + 6 + l * 13;
       seg(c, lx, 44, lx, 62, 2, '#6a4220'); c.fillStyle = '#ffe08a'; c.beginPath(); c.moveTo(lx, 40); c.lineTo(lx + 3.5, 47); c.lineTo(lx - 3.5, 47); c.fill();
     }
-    c.font = `600 13px ${BODY}`; c.fillStyle = WEAPONS[p.weapon].col;
-    c.fillText(`${WEAPONS[p.weapon].ta} ${'★'.repeat(p.wlvl || 1)} · ${String(p.score).padStart(7, '0')}`, x, 82);
+    { const owned = ['fire', 'vel', 'chakra', 'bomb'].filter(k => p.arms && p.arms[k]);
+      c.font = `600 13px ${BODY}`; c.fillStyle = owned.length ? WEAPONS[owned[owned.length - 1]].col : WEAPONS.arrow.col;
+      c.fillText(`${owned.length ? owned.map(k => SHORT[k] + '★'.repeat(p.arms[k])).join(' + ') : WEAPONS.arrow.ta} · ${String(p.score).padStart(7, '0')}`, x, 82); }
     if (p.fly > 0) { c.fillStyle = '#9fe3ff'; c.fillText(`சிறகு ${Math.ceil(p.fly)}s · ↑ பற`, x, 100); }
     if (p.out) { c.fillStyle = '#a3221a'; c.fillText('வீழ்ந்தான்', x, 100); }
   });
-  if (G.players.length < 2 && Math.floor(G.t * 1.5) % 2) {
+  if ((G.players.length < 2 || G.players[1].bot) && NET.mode !== 'host' && Math.floor(G.t * 1.5) % 2) {
     c.textAlign = 'right'; c.font = `600 13px ${BODY}`; c.fillStyle = 'rgba(159,184,255,.8)'; c.fillText('2-ஆம் வீரர்: F அழுத்தி சேருங்கள்', W - 20, 34);
   }
   if (G.savedT > 0) { G.savedT -= 1 / 60; c.textAlign = 'center'; c.font = `600 14px ${BODY}`; c.fillStyle = `rgba(159,227,160,${Math.min(1, G.savedT)})`; c.fillText('✓ முன்னேற்றம் சேமிக்கப்பட்டது · Progress saved', W / 2, 30); }
@@ -305,7 +334,7 @@ function renderTitle(c, dt) {
   c.fillStyle = g; c.fillText('வீரமாறன்', 56, 220); c.restore();
   c.font = `900 26px ${EN}`; c.fillStyle = '#e8b33a'; c.fillText('VEERAMAARAN', 62, 260);
   c.font = `400 17px ${BODY}`; c.fillStyle = '#d9c7a8'; c.fillText('பிறப்பு முதல் இறப்பு வரை · ஒரு வீரனின் கதை', 62, 292);
-  const opts = [['ஒரு வீரர்', '1 PLAYER'], ['இரு வீரர்கள் · ஒரே திரை', '2P · SAME KEYBOARD'], ['ஆன்லைன் · இரு லேப்டாப்', '2P · ONLINE LINK']];
+  const opts = [['ஒரு வீரர் + AI துணை', '1P + AI PARTNER'], ['இரு வீரர்கள் · ஒரே திரை', '2P · SAME KEYBOARD'], ['ஆன்லைன் · இரு லேப்டாப்', '2P · ONLINE LINK']];
   opts.forEach((o, i) => {
     const y = 330 + i * 38, sel = i === menuSel;
     c.fillStyle = sel ? 'rgba(255,120,40,.18)' : 'rgba(0,0,0,0)'; c.fillRect(56, y - 26, 470, 36);
@@ -346,7 +375,7 @@ function frame(now) {
     else if (G.state === 'play') { updatePlay(dt); if (G.state === 'play' || G.state === 'gameover') renderPlay(ctx, dt); }
     else if (G.state === 'gameover') {
       G.goT += raw; updateParts(dt); renderPlay(ctx, dt);
-      if (G.goT > 1.5 && startPressed()) { G.players.forEach(p => { p.out = false; p.lives = 5; p.score = 0; p.weapon = 'arrow'; }); startStage(G.stage); }
+      if (G.goT > 1.5 && startPressed()) { G.players.forEach(p => { p.out = false; p.lives = 5; p.score = 0; p.arms = {}; }); startStage(G.stage); }
     }
     if (NET.mode === 'host') NET.hostSend();
   } catch (err) { console.error(err); }

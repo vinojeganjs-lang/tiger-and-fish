@@ -61,6 +61,7 @@ function pollPads() {
   }
 }
 function readInput(i) {
+  if (i === 1 && G.players[1] && G.players[1].bot) return botInput(G.players[1]);
   if (i === 1 && typeof NET !== 'undefined' && NET.mode === 'host') return NET.remoteInput();
   const b = BIND[i];
   const any = a => a.some(c => keys[c]), anyP = a => a.some(c => pressed[c]);
@@ -247,7 +248,8 @@ const WEAPONS = {
   arrow: { cd: 0.17, speed: 1000, dmg: 1, ta: 'அம்பு', en: 'Arrow', col: '#f3e2b8' },
   fire: { cd: 0.3, speed: 820, dmg: 1, spread: true, ta: 'நெருப்பு அம்பு', en: 'Fire Arrows', col: '#ff8a2a' },
   vel: { cd: 0.4, speed: 1250, dmg: 4, pierce: true, ta: 'வேல்', en: 'Vel Spear', col: '#ffe08a' },
-  chakra: { cd: 0.075, speed: 900, dmg: 1, ta: 'சக்கரம்', en: 'Chakra', col: '#9fe3ff' }
+  chakra: { cd: 0.075, speed: 900, dmg: 1, ta: 'சக்கரம்', en: 'Chakra', col: '#9fe3ff' },
+  bomb: { cd: 0.85, speed: 380, dmg: 5, ta: 'தீக்குடுவை', en: 'Fire Pot Bomb', col: '#ffb03a' }
 };
 const PNAMES = [{ ta: 'வீரமாறன்', en: 'Veeramaaran' }, { ta: 'செங்கன்', en: 'Sengan' }];
 
@@ -258,7 +260,7 @@ class Player {
   }
   reset(x) {
     this.x = x; this.y = GROUND_Y - 260; this.vx = 0; this.vy = 0; this.w = 24;
-    this.face = 1; this.ground = false; this.inv = 2.5; this.dead = 0; this.weapon = this.weapon || 'arrow';
+    this.face = 1; this.ground = false; this.inv = 2.5; this.dead = 0; this.arms = this.arms || {}; this.cds = this.cds || {};
     this.cd = 0; this.phase = 0; this.aim = { x: 1, y: 0 }; this.crouch = false; this.dropT = 0; this.shootT = 0; this.spin = 0; this.fly = this.fly || 0;
   }
   get hb() {
@@ -303,26 +305,41 @@ class Player {
     if (this.ground && mx) this.phase += dt * 13; else if (this.ground) this.phase = 0;
     if (!this.ground && !(this.fly > 0)) this.spin += dt * 16 * this.face;
     if (this.y > H + 60) this.hurt(true);
-    if (inp.fire && this.cd <= 0) this.shoot();
+    for (const k in this.cds) this.cds[k] -= dt;
+    if (inp.fire) this.shoot();
   }
   muzzle() {
     const by = this.crouch ? 28 : this.ground || this.fly > 0 ? 48 : 34;
     return { x: this.x + this.aim.x * 30, y: this.y - by + this.aim.y * 24 };
   }
   shoot() {
-    const w = WEAPONS[this.weapon], lv = this.wlvl || 1; this.cd = w.cd * (1 - 0.15 * (lv - 1)); this.shootT = 0.12;
+    // every power the player has collected fires together, each on its own timer
     const m = this.muzzle(), base = Math.atan2(this.aim.y, this.aim.x);
-    const spreads = w.spread ? (lv >= 3 ? [-0.36, -0.24, -0.12, 0, 0.12, 0.24, 0.36] : [-0.24, -0.12, 0, 0.12, 0.24]) : lv >= 2 && !w.pierce ? [-0.05, 0.05] : [0];
-    for (const da of spreads) {
-      const a = base + da;
-      G.shots.push({ x: m.x, y: m.y, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, dmg: w.dmg * (1 + 0.5 * (lv - 1)), pierce: !!w.pierce, kind: this.weapon, life: 1.1, owner: this, hit: new Set(), rot: 0 });
+    const kinds = ['arrow'].concat(['fire', 'vel', 'chakra', 'bomb'].filter(k => this.arms[k]));
+    let snd = null;
+    for (const k of kinds) {
+      if ((this.cds[k] || 0) > 0) continue;
+      const w = WEAPONS[k], lv = k === 'arrow' ? 1 : this.arms[k];
+      this.cds[k] = w.cd * (1 - 0.15 * (lv - 1)); this.shootT = 0.12;
+      if (k === 'bomb') {
+        const dir = this.aim.x ? Math.sign(this.aim.x) : this.face;
+        for (let i = 0; i < lv; i++) G.shots.push({ x: m.x, y: m.y - 6, vx: dir * (w.speed + i * 120) * (this.aim.x ? 1 : 0.35), vy: -430 + (this.aim.y < 0 ? -180 : this.aim.y > 0 ? 260 : 0), dmg: w.dmg * (1 + 0.5 * (lv - 1)), lv, kind: 'bomb', life: 3, owner: this, hit: new Set() });
+        snd = snd || 'fire'; continue;
+      }
+      const spreads = w.spread ? (lv >= 3 ? [-0.36, -0.24, -0.12, 0, 0.12, 0.24, 0.36] : [-0.24, -0.12, 0, 0.12, 0.24]) : lv >= 2 && !w.pierce ? [-0.05, 0.05] : [0];
+      for (const da of spreads) {
+        const a = base + da;
+        G.shots.push({ x: m.x, y: m.y, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, dmg: w.dmg * (1 + 0.5 * (lv - 1)), pierce: !!w.pierce, kind: k, life: 1.1, owner: this, hit: new Set(), rot: 0 });
+      }
+      snd = k === 'vel' ? 'vel' : k === 'fire' && snd !== 'vel' ? 'fire' : snd || 'shoot';
     }
-    AUDIO.sfx(this.weapon === 'vel' ? 'vel' : this.weapon === 'fire' ? 'fire' : 'shoot');
+    if (snd) AUDIO.sfx(snd);
   }
   hurt(pit) {
     if (this.dead > 0 || this.out) return;
     if (!pit && this.inv > 0) return;
-    this.lives--; this.fly = 0; this.dead = 1.5; this.vy = -500; this.weapon = 'arrow'; this.wlvl = 1; this.inv = 0;
+    if (!this.bot) this.lives--; this.fly = 0; this.dead = 1.5; this.vy = -500; this.inv = 0;
+    for (const k in this.arms) { this.arms[k]--; if (this.arms[k] <= 0) delete this.arms[k]; } // dying costs one level of each power, not everything
     bloodBurst(this.x, this.y - 40, -this.face, 30); AUDIO.sfx('hurt'); G.shake = 12;
     if (pit) { this.dead = 0.6; this.vy = 0; this.y = H + 100; }
   }
@@ -337,4 +354,45 @@ class Player {
     });
     c.globalAlpha = 1;
   }
+}
+
+/* ===== AI teammate (Sengan) for single-player ===== */
+function botInput(b) {
+  const inp = { left: false, right: false, up: false, down: false, jump: false, fire: false, jumpP: false, fireP: false };
+  if (b.dead > 0 || b.out) return inp;
+  const lead = G.players[0];
+  const lx = lead && !lead.out && lead.dead <= 0 ? lead.x : G.cam + W * 0.45;
+  let tgt = null, best = 1e9;
+  for (const e of G.enemies) {
+    if (e.x < G.cam - 10 || e.x > G.cam + W + 10) continue;
+    const d = Math.abs(e.x - b.x) + Math.abs((e.y - e.h / 2) - (b.y - 40)) * 0.6;
+    if (d < best) { best = d; tgt = { x: e.x, y: e.y - e.h / 2, low: e.type === 'boar' }; }
+  }
+  if (G.boss && !G.bossGone && !G.clearT) for (const bx of G.boss.boxes()) {
+    if (!bx) continue; const cx = bx.x + bx.w / 2, cy = bx.y + bx.h / 2, d = Math.abs(cx - b.x) * 0.8 + 50;
+    if (d < best) { best = d; tgt = { x: cx, y: cy }; }
+  }
+  // keep close to the hero, and clear of the boss's body
+  let want = lx - 70;
+  if (G.boss && !G.bossGone) { const bb = G.boss.body().filter(Boolean)[0]; if (bb && want > bb.x - 110) want = bb.x - 110; }
+  want = clamp(want, G.cam + 40, G.cam + W - 60);
+  let mx = b.x < want - 30 ? 1 : b.x > want + 30 ? -1 : 0;
+  let up = false, down = false;
+  if (tgt) {
+    const dx = tgt.x - b.x, dy = tgt.y - (b.y - 48), dir = dx < 0 ? -1 : 1;
+    if (dy < -60 && Math.abs(dx) < -dy * 0.6) { up = true; mx = 0; }
+    else if (dy < -60) { up = true; if (!mx) mx = dir; }
+    else { if (dir !== b.face && !mx) mx = dir; if (tgt.low && !mx && b.ground) down = true; }
+    inp.fire = Math.abs(dx) < W * 0.8;
+  }
+  let jump = b.ground && mx !== 0 && !groundAt(b.x + mx * 40);
+  for (const s of G.eshots) {
+    const d = s.x - b.x;
+    if (Math.abs(d) < 110 && s.y > b.y - 50 && (s.box === 'wave' || s.box === 'slash' || (Math.sign(s.vx) === -Math.sign(d) && Math.abs(s.vy) < 250))) { jump = true; break; }
+  }
+  if (b.ground && b.x < G.cam + 30 && lx > b.x + 200) mx = 1;
+  inp.left = mx < 0; inp.right = mx > 0; inp.up = up; inp.down = down;
+  inp.jump = jump || (!b.ground && b.vy < 0);
+  if (jump && b.ground && G.t - (b._jt || 0) > 0.35) { inp.jumpP = true; b._jt = G.t; }
+  return inp;
 }

@@ -14,12 +14,12 @@ function groundWave(x, dir, speed = 430) { eshoot(x, GROUND_Y, dir * speed, 0, '
 function bossChief() {
   const AL = G.cam, AR = G.cam + W;
   return baseBoss({
-    name: { ta: 'கருநாகன் · கொள்ளைத் தலைவன்', en: 'Karunagan, the Raider Chief' }, hp: 70,
+    name: { ta: 'கருநாகன் · கொள்ளைத் தலைவன்', en: 'Karunagan, the Raider Chief' }, hp: 55,
     x: AR - 170, y: GROUND_Y, st: 'intro', stT: 1.4,
     update(dt) {
       this.t += dt; this.stT -= dt; this.flash -= dt;
       const p = nearestPlayer(this.x) || { x: AL + 200, y: GROUND_Y };
-      const rage = this.hp < this.max * 0.45 ? 1.35 : 1;
+      const rage = this.hp < this.max * 0.45 ? 1.15 : 1;
       if (this.st !== 'leap') this.face = p.x < this.x ? -1 : 1;
       if (this.st === 'intro') { if (this.stT <= 0) { AUDIO.sfx('roar'); G.shake = 10; this.go('walk', 1.2); } }
       else if (this.st === 'walk') {
@@ -29,7 +29,7 @@ function bossChief() {
       } else if (this.st === 'throw') {
         this.attack = Math.min(1, this.attack + dt * 5);
         const due = 1.1 - this.n * 0.38;
-        if (this.n < 3 && this.stT < due) {
+        if (this.n < 2 && this.stT < due) {
           this.n++; this.attack = 0;
           lob(this.x + this.face * 30, this.y - 120, p.x + rand(-60, 60), GROUND_Y - 30, 0.85 / rage, 1100, 'axe');
           AUDIO.sfx('shoot');
@@ -60,9 +60,9 @@ function bossChief() {
 function bossShip() {
   const AL = G.cam, AR = G.cam + W, xL = AR - 330, deck = 300;
   const parts = [
-    { k: 'cat', x: xL + 70, hp: 26, cool: 1.2 },
-    { k: 'cap', x: xL + 178, hp: 40, cool: 2.2 },
-    { k: 'cat', x: xL + 272, hp: 26, cool: 2.6 }
+    { k: 'cat', x: xL + 70, hp: 20, cool: 2.0 },
+    { k: 'cap', x: xL + 178, hp: 32, cool: 3.0 },
+    { k: 'cat', x: xL + 272, hp: 20, cool: 3.6 }
   ];
   const b = baseBoss({
     name: { ta: 'கடற்கொள்ளை மரக்கலம்', en: 'The Corsair War-Ship' }, hp: 92, parts, xL, deck, spawnT: 3,
@@ -75,11 +75,11 @@ function bossShip() {
         if (q.hp <= 0) { if (Math.random() < 0.3) part({ x: q.x + rand(-20, 20), y: deck + dy - 20, vx: rand(-20, 20), vy: rand(-90, -40), life: 1, max: 1, size: rand(8, 14), color: '#2a1a14', shape: 'smoke', g: -30 }); continue; }
         q.cool -= dt;
         const p = nearestPlayer(q.x, deck); if (!p || q.cool > 0) continue;
-        if (q.k === 'cat') { q.cool = rand(2.0, 2.8); q.arm = 1; lob(q.x - 30, deck + dy - 70, p.x + rand(-40, 40), GROUND_Y, 1.3, 700, 'pot'); AUDIO.sfx('fire'); }
-        else { q.cool = 1.3; q.attack = 0.01; const a = Math.atan2(p.y - 40 - (deck - 90), p.x - q.x); eshoot(q.x, deck + dy - 90, Math.cos(a) * 520, Math.sin(a) * 520, 'javelin'); AUDIO.sfx('shoot'); }
+        if (q.k === 'cat') { q.cool = rand(3.4, 4.4); q.arm = 1; lob(q.x - 30, deck + dy - 70, p.x + rand(-40, 40), GROUND_Y, 1.3, 700, 'pot'); AUDIO.sfx('fire'); }
+        else { q.cool = 2.4; q.attack = 0.01; const a = Math.atan2(p.y - 40 - (deck - 90), p.x - q.x); eshoot(q.x, deck + dy - 90, Math.cos(a) * 520, Math.sin(a) * 520, 'javelin'); AUDIO.sfx('shoot'); }
       }
       for (const q of parts) { q.arm = Math.max(0, (q.arm || 0) - dt * 2); if (q.attack) q.attack = Math.min(1, q.attack + dt * 4); }
-      if (this.spawnT <= 0 && G.enemies.length < 6) { this.spawnT = rand(2.6, 3.8); spawnEnemy('soldier', xL + 10, deck, { dir: -1 }); }
+      if (this.spawnT <= 0 && G.enemies.length < 3) { this.spawnT = rand(6, 8); spawnEnemy('soldier', xL + 10, deck, { dir: -1 }); }
       this.hp = parts.reduce((s, q) => s + Math.max(0, q.hp), 0);
     },
     block() { return xL - 10; },
@@ -172,7 +172,7 @@ function drawElephant(c, x, y, ph, rear, flash, t) {
 function bossElephant() {
   const AL = G.cam, AR = G.cam + W, home = AR - 190;
   return baseBoss({
-    name: { ta: 'கார்மலை மன்னனின் போர் யானை', en: "The King of Kaarmalai's War Elephant" }, hp: 130,
+    name: { ta: 'கார்மலை மன்னனின் போர் யானை', en: "The King of Kaarmalai's War Elephant" }, hp: 105,
     x: AR + 220, y: GROUND_Y, st: 'enter', rear: 0,
     update(dt) {
       this.t += dt; this.stT -= dt; this.flash -= dt;
@@ -186,12 +186,12 @@ function bossElephant() {
       } else if (this.st === 'stomp') {
         const k = 1 - this.stT;
         this.rear = k < 0.6 ? Math.sin(k / 0.6 * Math.PI / 2) * 0.9 : Math.max(0, 0.9 - (k - 0.6) * 9);
-        if (k >= 0.66 && !this.n) { this.n = 1; G.shake = 18; AUDIO.sfx('boom'); groundWave(this.x - 150, -1, 400); groundWave(this.x + 140, 1, 400); burst(this.x - 120, GROUND_Y, 30, { colors: ['#5a4030', '#3a2a1e'], g: 700, min: 80, max: 380, vy: -200 }); }
+        if (k >= 0.66 && !this.n) { this.n = 1; G.shake = 18; AUDIO.sfx('boom'); groundWave(this.x - 150, -1, 380); burst(this.x - 120, GROUND_Y, 30, { colors: ['#5a4030', '#3a2a1e'], g: 700, min: 80, max: 380, vy: -200 }); }
         if (this.stT <= 0) { this.rear = 0; this.go('volley', 2.2); }
       } else if (this.st === 'volley') {
-        if (this.n < 3 && this.stT < 2.0 - this.n * 0.6) {
+        if (this.n < 2 && this.stT < 2.0 - this.n * 0.8) {
           this.n++; AUDIO.sfx('shoot');
-          for (let i = -1; i <= 1; i++) lob(this.x + 5, this.y - 250, p.x + i * 70, GROUND_Y - 20, 1.0, 800, 'arrow', { burning: true });
+          for (const i of [-0.6, 0.6]) lob(this.x + 5, this.y - 250, p.x + i * 70, GROUND_Y - 20, 1.0, 800, 'arrow');
         }
         if (this.stT <= 0) this.go(this.x < home - 10 ? 'back' : 'trumpet', 1.1);
       } else if (this.st === 'back') { this.x += 170 * dt; this.phase += dt * 5; if (this.x >= home) { this.x = home; this.go('trumpet', 1.0); } }
@@ -232,7 +232,7 @@ function drawHorse(c, x, y, ph, dir) {
 function bossEmperor() {
   const AL = G.cam, AR = G.cam + W;
   return baseBoss({
-    name: { ta: 'இருள்மன்னன் · வடபுலப் பேரரசன்', en: 'Irulmannan, Emperor of the Dark North' }, hp: 220,
+    name: { ta: 'இருள்மன்னன் · வடபுலப் பேரரசன்', en: 'Irulmannan, Emperor of the Dark North' }, hp: 170,
     x: AR + 320, y: GROUND_Y, st: 'ride', side: 1, dir: -1, wheel: 0, marks: [], p2: false,
     target() { return this.side === 1 ? AR - 170 : AL + 170; },
     update(dt) {
@@ -251,9 +251,9 @@ function bossEmperor() {
           if ((this.dir < 0 && this.x <= tx) || (this.dir > 0 && this.x >= tx)) { this.x = tx; this.go('park', 3.0); }
         } else if (this.st === 'park') {
           this.phase += dt * 3;
-          if (this.n < 3 && this.stT < 2.6 - this.n * 0.7) { this.n++; this.attack = 0.01; const a = Math.atan2(p.y - 40 - (this.y - 120), p.x - this.x); eshoot(this.x, this.y - 120, Math.cos(a) * 560, Math.sin(a) * 560, 'javelin'); AUDIO.sfx('shoot'); }
+          if (this.n < 2 && this.stT < 2.6 - this.n * 1.0) { this.n++; this.attack = 0.01; const a = Math.atan2(p.y - 40 - (this.y - 120), p.x - this.x); eshoot(this.x, this.y - 120, Math.cos(a) * 560, Math.sin(a) * 560, 'javelin'); AUDIO.sfx('shoot'); }
           if (this.attack) this.attack = Math.min(1, this.attack + dt * 4);
-          if (this.stT < 1.8 && !this.rained) { this.rained = true; AUDIO.sfx('warn'); for (let i = 0; i < 6; i++) this.marks.push({ x: AL + 60 + i * (W - 120) / 5 + rand(-30, 30), t: 1.1 }); }
+          if (false && this.stT < 1.8 && !this.rained) { this.rained = true; AUDIO.sfx('warn'); for (let i = 0; i < 6; i++) this.marks.push({ x: AL + 60 + i * (W - 120) / 5 + rand(-30, 30), t: 1.1 }); }
           if (this.stT <= 0) { this.rained = false; this.go('charge', 0.7); AUDIO.sfx('warn'); }
         } else if (this.st === 'charge') {
           this.phase += dt * 18; this.wheel += dt * 18 * this.dir;
@@ -262,7 +262,7 @@ function bossEmperor() {
         }
       } else {
         if (this.st !== 'dash' && this.st !== 'slam') this.face = p.x < this.x ? -1 : 1;
-        if (this.st === 'stalk') { this.x += this.face * 130 * dt; this.phase += dt * 9; if (this.stT <= 0) { const r = Math.random(); this.go(r < 0.36 ? 'dash' : r < 0.7 ? 'slash' : 'slam', r < 0.36 ? 0.5 : 1.4); if (this.st === 'slam') { this.vy = -1000; this.vx = clamp((p.x - this.x) / 1.0, -560, 560); } } }
+        if (this.st === 'stalk') { this.x += this.face * 130 * dt; this.phase += dt * 9; if (this.stT <= 0) { const r = Math.random(); this.go(r < 0.5 ? 'dash' : 'slash', r < 0.5 ? 0.6 : 1.4); if (this.st === 'slam') { this.vy = -1000; this.vx = clamp((p.x - this.x) / 1.0, -560, 560); } } }
         else if (this.st === 'dash') {
           if (this.stT > 0) { if (Math.random() < 0.5) burst(this.x, this.y - 10, 2, { colors: ['#5a4030', '#3a2a1e'], g: 300, min: 20, max: 90, lmax: 0.4 }); }
           else {
@@ -271,7 +271,7 @@ function bossEmperor() {
           }
         } else if (this.st === 'slash') {
           this.attack = Math.min(1, this.attack + dt * 5);
-          if (this.n < 3 && this.stT < 1.2 - this.n * 0.4) { this.n++; this.attack = 0; const tp = nearestPlayer(this.x) || { x: this.x + this.face * 300, y: GROUND_Y }; const a = Math.atan2(tp.y - 40 - (this.y - 110), tp.x - this.x); eshoot(this.x, this.y - 110, Math.cos(a) * 560, Math.sin(a) * 560, 'javelin'); AUDIO.sfx('shoot'); }
+          if (this.n < 2 && this.stT < 1.2 - this.n * 0.5) { this.n++; this.attack = 0; const tp = nearestPlayer(this.x) || { x: this.x + this.face * 300, y: GROUND_Y }; const a = Math.atan2(tp.y - 40 - (this.y - 110), tp.x - this.x); eshoot(this.x, this.y - 110, Math.cos(a) * 560, Math.sin(a) * 560, 'javelin'); AUDIO.sfx('shoot'); }
           if (this.stT <= 0) this.go('stalk', 1.0);
         } else if (this.st === 'slam') {
           this.vy += 2000 * dt; this.x += this.vx * dt; this.y += this.vy * dt;
