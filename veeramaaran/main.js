@@ -177,8 +177,7 @@ function updatePlay(dt) {
       if (k.kind === 'jet') { p.fly = 15; G.banner = { ta: 'கருடச் சிறகு!', en: 'Garuda wings: hold ↑ to fly', t: 2.2, small: true }; }
       else if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }
       else {
-        // team power: with the AI partner, whoever grabs a weapon power, both warriors get it
-        const team = G.players.some(q => q.bot) ? G.players.filter(q => !q.out) : [p];
+        const team = [p]; // a power belongs only to the warrior who grabs it
         for (const q of team) { q.arms = q.arms || {}; q.arms[k.kind] = Math.min(3, (q.arms[k.kind] || 0) + 1); }
         const lv = p.arms[k.kind], both = team.length > 1 ? ' · இருவருக்கும்' : '';
         G.banner = lv > 1 ? { ta: `${WEAPONS[k.kind].ta} · சக்தி ${lv}${both}`, en: `${WEAPONS[k.kind].en} power ${lv}${team.length > 1 ? ' for both' : ''}`, t: 1.6, small: true }
