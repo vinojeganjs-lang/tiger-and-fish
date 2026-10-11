@@ -16,13 +16,13 @@ function aimShot(x, y, speed, kind, o) {
   const a = Math.atan2((p.y - 36) - y, p.x - x);
   eshoot(x, y, Math.cos(a) * speed, Math.sin(a) * speed, kind, o);
 }
-function enemyPal() { return [PAL.bandit, PAL.pirate, PAL.soldier, PAL.dark][G.stage]; }
+function enemyPal() { return [PAL.bandit, PAL.pirate, PAL.desert, PAL.hill, PAL.soldier, PAL.soldier, PAL.dark, PAL.dark][G.stage] || PAL.dark; }
 
 /* ===== Regular enemies ===== */
 const ETYPES = {
   soldier: {
     hp: 1, w: 24, h: 62, score: 100,
-    init(e) { e.dir = e.x > G.cam + W / 2 ? -1 : 1; e.speed = rand(130, 175) + G.stage * 12; e.thrower = G.stage >= 1 && Math.random() < 0.35; e.throwAt = rand(0.6, 1.6); e.weapon = e.thrower ? 'spear' : 'sword'; },
+    init(e) { e.dir = e.x > G.cam + W / 2 ? -1 : 1; e.speed = rand(130, 175) + Math.min(G.stage, 5) * 10; e.thrower = G.stage >= 1 && Math.random() < 0.35; e.throwAt = rand(0.6, 1.6); e.weapon = e.thrower ? 'spear' : 'sword'; },
     update(e, dt) {
       e.phase += dt * 11;
       let mv = e.dir * e.speed;
@@ -45,7 +45,7 @@ const ETYPES = {
       const a = Math.atan2((p.y - 36) - (e.y - 48), p.x - e.x);
       e.aim = { x: Math.cos(a), y: Math.sin(a) };
       e.cool -= dt; e.drawn = e.cool < 0.35;
-      if (e.cool <= 0 && e.x < G.cam + W - 20) { e.cool = rand(1.5, 2.3) - G.stage * 0.15; eshoot(e.x + e.aim.x * 26, e.y - 48 + e.aim.y * 26, e.aim.x * 430, e.aim.y * 430, 'arrow', { burning: G.stage >= 2 }); AUDIO.sfx('shoot'); }
+      if (e.cool <= 0 && e.x < G.cam + W - 20) { e.cool = rand(1.5, 2.3) - Math.min(G.stage, 5) * 0.1; eshoot(e.x + e.aim.x * 26, e.y - 48 + e.aim.y * 26, e.aim.x * 430, e.aim.y * 430, 'arrow', { burning: G.stage >= 4 }); AUDIO.sfx('shoot'); }
     },
     draw(c, e) { drawWarrior(c, e.x, e.y, { face: e.dir, state: 'idle', aim: e.aim || { x: e.dir, y: 0 }, pal: enemyPal(), weapon: 'bow', drawn: e.cool > 1.2, flash: e.flash }); }
   },
@@ -133,7 +133,7 @@ function killEnemy(e, s) {
   const cx = e.x, cy = e.y - e.h / 2, dir = s ? Math.sign(s.vx) || 1 : 1;
   if (e.type === 'kite') {
     burst(cx, cy, 14, { colors: ['#2a1408', '#4a2a14'], g: 400, smin: 2, smax: 4, shape: 'shard' });
-    const r = Math.random(), jetP = G.stage === 3 ? 0.35 : 0.2, lifeP = G.boss ? 0.25 : 0.15;
+    const r = Math.random(), jetP = G.stage === LAST ? 0.35 : 0.2, lifeP = G.boss ? 0.25 : 0.15;
     G.pickups.push({ x: cx, y: cy, vy: -200, kind: r < jetP ? 'jet' : r < jetP + lifeP ? 'life' : ['fire', 'vel', 'chakra', 'bomb'][(Math.random() * 4) | 0], t: 0 });
   } else if (e.type === 'catapult') { fireBurst(cx, cy, 40, 1.4); AUDIO.sfx('boom'); G.shake = 8; }
   else {

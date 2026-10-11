@@ -133,7 +133,8 @@ const NET = {
       s.k = G.pickups.map(k => [r0(k.x), r0(k.y), WK.indexOf(k.kind), r1(k.t)]);
       if (G.boss) {
         const b = G.boss, o = {};
-        for (const k of BOSS_KEYS) if (b[k] !== undefined) o[k] = typeof b[k] === 'number' ? r2(b[k]) : b[k];
+        for (const k of Object.keys(b)) { const v = b[k]; if (typeof v === 'number') o[k] = r2(v); else if (typeof v === 'boolean' || (typeof v === 'string' && v.length < 24)) o[k] = v; }
+        for (const F of ['A', 'B']) if (b[F]) { const f = b[F]; o[F] = [r0(f.x), r0(f.y), f.face, r1(f.ph), f.st, r1(f.atk), f.flash > 0 ? 1 : 0, r0(f.hp), r1(f.deadT)]; }
         if (b.parts) o.parts = b.parts.map(q => [q.hp, r1(q.arm), r1(q.attack), q.flash > 0 ? 1 : 0, r1(q.cool)]);
         if (b.marks) o.marks = b.marks.map(m => [r0(m.x), r2(m.t), m.done ? 1 : 0]);
         if (b.wreck) o.wreck = r0(b.wreck.x);
@@ -193,7 +194,8 @@ const NET = {
       G.pickups = (s.k || []).map(a => ({ x: a[0], y: a[1], kind: WK[a[2]], t: a[3], vy: 0 }));
       if (s.b) {
         if (!G.boss || G.bossStage !== s.st) { G.boss = makeBoss(s.st); G.bossStage = s.st; }
-        const b = G.boss; for (const k of BOSS_KEYS) if (k in s.b) b[k] = s.b[k];
+        const b = G.boss; for (const k in s.b) { const v = s.b[k]; if (typeof v !== 'object' && typeof b[k] !== 'function') b[k] = v; }
+        for (const F of ['A', 'B']) if (s.b[F] && b[F]) { const a = s.b[F]; Object.assign(b[F], { x: a[0], y: a[1], face: a[2], ph: a[3], st: a[4], atk: a[5], flash: a[6] ? 0.05 : 0, hp: a[7], deadT: a[8] }); }
         if (s.b.parts && b.parts) s.b.parts.forEach((a, i) => Object.assign(b.parts[i], { hp: a[0], arm: a[1], attack: a[2], flash: a[3] ? 0.05 : 0, cool: a[4] }));
         if (s.b.marks) b.marks = s.b.marks.map(a => ({ x: a[0], t: a[1], done: !!a[2] }));
         if (s.b.wreck !== undefined) b.wreck = { x: s.b.wreck };

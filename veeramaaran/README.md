@@ -1,6 +1,6 @@
 # வீரமாறன் · Veeramaaran
 
-Contra-style run-and-gun Tamil warrior saga set in 1600 BCE — from Veeramaaran's birth on the banks of the Porunai to his funeral, where both his hands hang empty outside the bier.
+Contra-style run-and-gun Tamil warrior saga set in 1600 BCE, in eight chapters across the Sangam landscapes (forest, sea, desert, hills, fortress, fields, river, war) — from Veeramaaran's birth on the banks of the Porunai to his funeral, where both his hands hang empty outside the bier.
 
 **Play:** open `index.html` (GitHub Pages).
 

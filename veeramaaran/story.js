@@ -83,9 +83,10 @@ function paintTheme(i) {
   return (c, t) => { drawBackground(c, THEMES[i], t * 40, t); drawEmbers(c, 0.016, t, 0.6); c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(0, 0, W, H); };
 }
 function paintChapter(i) {
-  const names = [['கானகம்', 'The Burning Forest'], ['கடல்', 'The Corsair Sea'], ['கார்மலைக் கோட்டை', 'The Fortress of Kaarmalai'], ['பெரும்போர்', 'The Great War']];
-  const nums = ['ஒன்று', 'இரண்டு', 'மூன்று', 'நான்கு'], rom = ['I', 'II', 'III', 'IV'];
+  const fallback = [['கானகம்', 'The Burning Forest'], ['கடல்', 'The Corsair Sea'], ['பாலை', 'The Red Desert'], ['குறிஞ்சி மலை', 'The Kurinji Hills'], ['கார்மலைக் கோட்டை', 'The Fortress of Kaarmalai'], ['மருத நிலம்', 'The Burning Fields'], ['இரவு ஆறு', 'The Night River'], ['பெரும்போர்', 'The Great War']];
+  const nums = ['ஒன்று', 'இரண்டு', 'மூன்று', 'நான்கு', 'ஐந்து', 'ஆறு', 'ஏழு', 'எட்டு'], rom = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
   return (c, t) => {
+    const names = typeof STAGE_NAMES !== 'undefined' ? STAGE_NAMES : fallback;
     drawBackground(c, THEMES[i], t * 25, t); c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(0, 0, W, H); drawEmbers(c, 0.016, t, 1);
     const a = clamp(t / 0.8, 0, 1) * clamp((4.5 - t) / 0.6, 0, 1);
     c.globalAlpha = a; c.textAlign = 'center';
@@ -101,7 +102,7 @@ function paintChapter(i) {
   };
 }
 function paintReunion(c, t) {
-  drawBackground(c, THEMES[2], 300, t); c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(0, 0, W, H);
+  drawBackground(c, THEMES[4], 300, t); c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(0, 0, W, H);
   c.fillStyle = '#120806'; c.fillRect(0, 440, W, H);
   const meet = clamp(t / 4, 0, 1), hx = lerp(260, 455, meet), wx = lerp(700, 492, meet);
   if (t > 4.2 && t < 4.6) burst(W / 2, 380, 3, { colors: ['#9aa0aa', '#e8eef5'], g: 900, min: 100, max: 300, shape: 'shard', lmax: 1 });
@@ -214,12 +215,20 @@ const SCENES = {
   after1: { dur: 8, music: null, paint: paintTheme(0), lines: [
     [0.3, 'சாகும் முன் கருநாகன் சொன்னான்: "அவள் கடல் கடந்து கார்மலைக்குப் போகிறாள்…"', 'Dying, Karunagan spoke: "She sails across the sea, to Kaarmalai…"']] },
   after2: { dur: 8, music: null, paint: paintTheme(1), lines: [
-    [0.3, 'மரக்கலம் எரிந்து மூழ்கியது. கார்மலைக் கோட்டை கண்முன் எழுந்தது.', 'The war-ship burned and sank. The fortress of Kaarmalai rose ahead.']] },
+    [0.3, 'மரக்கலம் எரிந்து மூழ்கியது. கரையில் இறங்கியதும் கண்முன் விரிந்தது — எரியும் பாலை.', 'The war-ship burned and sank. Ashore, the burning Palai desert lay ahead.']] },
+  afterDesert: { dur: 8, music: null, paint: paintTheme(2), lines: [
+    [0.3, 'பாலைத் தேள் மணலில் புதைந்தது. தொலைவில் குறிஞ்சி மலைகள் நீலமாய்த் தெரிந்தன.', 'The great scorpion sank into the sand. Far off, the Kurinji hills rose blue.']] },
+  afterHills: { dur: 8, music: null, paint: paintTheme(3), lines: [
+    [0.3, 'மலை வேங்கை வீழ்ந்தது. உச்சியிலிருந்து கார்மலைக் கோட்டை தெரிந்தது.', 'The man-eater fell. From the summit, the fortress of Kaarmalai came into view.']] },
   after3: { dur: 13, music: 'calm', paint: paintReunion, lines: [
     [0.3, 'சங்கிலிகள் உடைந்தன. இளவேனில் அவன் கைகளில்.', 'The chains broke. Ilavenil was in his arms.'],
     [6.5, 'அன்றே கார்மலை வீழ்ந்தது. வீரமாறன் அதன் மன்னன் ஆனான்.', 'That day Kaarmalai fell, and Veeramaaran became its king.']] },
-  pre4: { dur: 7, music: null, paint: paintTheme(3), lines: [
-    [0.3, 'பத்து ஆண்டுகள் கழித்து… வடக்கிலிருந்து இருள்மன்னனின் பெரும்படை வந்தது.', "Ten years later, Irulmannan's great host marched from the north."]] },
+  pre4: { dur: 7, music: null, paint: paintTheme(5), lines: [
+    [0.3, 'பத்து ஆண்டுகள் கழித்து… வடக்கிலிருந்து இருள்மன்னனின் பெரும்படை மருத நிலங்களைக் கொளுத்தியது.', "Ten years later, Irulmannan's great host set the Marutham fields ablaze."]] },
+  afterFields: { dur: 8, music: null, paint: paintTheme(5), lines: [
+    [0.3, 'முற்றுகைக் கோபுரம் சரிந்தது. ஆற்றின் மறுகரையில் இருள்மன்னனின் இரட்டை மல்லர்கள் காத்திருந்தனர்.', "The siege tower crashed down. Across the river, Irulmannan's twin champions waited."]] },
+  afterRiver: { dur: 8, music: null, paint: paintTheme(6), lines: [
+    [0.3, 'ஆறு சிவந்தது. இனி இருள்மன்னனுடன் நேருக்கு நேர்.', 'The river ran red. Now only Irulmannan himself remained.']] },
   victory: { dur: 11, music: 'calm', paint: paintThrone, lines: [
     [0.3, 'இரு நாடுகள் மோதின. வீரமாறன் வென்றான்.', 'Two nations clashed. Veeramaaran prevailed.'],
     [5.2, 'பொன், மண், புகழ் — அனைத்தும் அவன் காலடியில்.', 'Gold, land and glory lay at his feet.']] },
@@ -233,7 +242,7 @@ const SCENES = {
     [15, '"நான் எதையும் எடுத்துச் செல்லவில்லை."', '"I take nothing with me."', true]] },
   credits: { dur: 9, music: 'calm', paint: paintCredits, lines: [] }
 };
-for (let i = 0; i < 4; i++) SCENES['ch' + (i + 1)] = { dur: 4.6, paint: paintChapter(i), lines: [] };
+for (let i = 0; i < 8; i++) SCENES['ch' + (i + 1)] = { dur: 4.6, paint: paintChapter(i), lines: [] };
 
 /* ===== Scene runner ===== */
 function runScenes(list, after) { G.state = 'scene'; G.sq = list; G.si = 0; G.after = after; startScene(); }
