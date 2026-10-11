@@ -9,9 +9,9 @@ function buildLevel(i) {
   for (const [gx, gw] of gaps) { L.ground.push({ x, w: gx - x }); x = gx + gw; }
   L.ground.push({ x, w: len + 800 - x });
   for (let px = 700; px < L.bossX - 300; px += 360 + r() * 440) {
-    const hi = r() < 0.35; L.plats.push({ x: px, y: GROUND_Y - (hi ? 200 : 118), w: 130 + r() * 110 });
+    const hi = r() < 0.35; L.plats.push({ x: px, y: GROUND_Y - (hi ? 168 : 112), w: 140 + r() * 110 });
   }
-  if (i !== 2) L.plats.push({ x: L.bossX + 190, y: GROUND_Y - 150, w: 150 }, { x: L.bossX + 450, y: GROUND_Y - 150, w: 140 });
+  if (i !== 2) L.plats.push({ x: L.bossX + 190, y: GROUND_Y - 140, w: 160 }, { x: L.bossX + 450, y: GROUND_Y - 140, w: 150 });
   for (const p of L.plats) if (p.x < L.bossX - 250 && r() < 0.5) L.spawns.push({ x: p.x + p.w / 2, y: p.y, type: 'archer' });
   for (let sx = 1150; sx < L.bossX - 600; sx += 800 + r() * 700) L.spawns.push({ x: sx, y: GROUND_Y, type: i >= 2 && r() < 0.55 ? 'catapult' : 'boar' });
   for (let sx = 650; sx < L.bossX - 200; sx += 650 + r() * 350) L.spawns.push({ x: sx, y: 150, type: 'kite' });
@@ -170,7 +170,7 @@ function updatePlay(dt) {
     k.t += dt; k.vy = Math.min(k.vy + 900 * dt, 500); const py = k.y; k.y += k.vy * dt;
     if (k.y >= GROUND_Y - 14 && groundAt(k.x)) { k.y = GROUND_Y - 14; k.vy = 0; }
     for (const p of G.plats || []) {}
-    for (const p of alivePlayers()) if (!p.bot && Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
+    for (const p of alivePlayers()) if (!k.dead && Math.abs(p.x - k.x) < 30 && Math.abs(p.y - 30 - k.y) < 50) {
       k.dead = true; AUDIO.sfx('pick');
       if (k.kind === 'jet') { p.fly = 15; G.banner = { ta: 'கருடச் சிறகு!', en: 'Garuda wings: hold ↑ to fly', t: 2.2, small: true }; }
       else if (k.kind === 'life') { p.lives = Math.min(9, p.lives + 1); G.banner = { ta: 'உயிர் +1', en: 'Extra life', t: 1.6, small: true }; }

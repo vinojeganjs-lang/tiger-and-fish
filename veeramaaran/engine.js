@@ -288,7 +288,7 @@ class Player {
     const l = Math.hypot(ax, ay); this.aim = { x: ax / l, y: ay / l };
     if (inp.jumpP && this.ground) {
       if (inp.down && this.onPlat) { this.dropT = 0.25; this.ground = false; this.y += 3; }
-      else { this.vy = -770; this.ground = false; AUDIO.sfx('jump'); burst(this.x, this.y, 6, { colors: ['#6a4a30', '#8a6a48'], g: 300, min: 20, max: 90, lmax: 0.4 }); }
+      else { this.vy = -870; this.ground = false; AUDIO.sfx('jump'); burst(this.x, this.y, 6, { colors: ['#6a4a30', '#8a6a48'], g: 300, min: 20, max: 90, lmax: 0.4 }); }
     }
     if (this.fly > 0) {
       this.fly -= dt;
@@ -375,14 +375,19 @@ function botInput(b) {
   // keep close to the hero, and clear of the boss's body
   let want = lx - 70;
   if (G.boss && !G.bossGone) { const bb = G.boss.body().filter(Boolean)[0]; if (bb && want > bb.x - 110) want = bb.x - 110; }
+  // walk over to grab a power-up lying close by
+  let near = null;
+  for (const k of G.pickups) if (k.y > GROUND_Y - 60 && Math.abs(k.x - b.x) < 320 && k.x > G.cam + 20 && k.x < G.cam + W - 20 && (!near || Math.abs(k.x - b.x) < Math.abs(near.x - b.x))) near = k;
+  if (near) want = near.x;
   want = clamp(want, G.cam + 40, G.cam + W - 60);
-  let mx = b.x < want - 30 ? 1 : b.x > want + 30 ? -1 : 0;
+  const tol = near ? 8 : 30;
+  let mx = b.x < want - tol ? 1 : b.x > want + tol ? -1 : 0;
   let up = false, down = false;
   if (tgt) {
     const dx = tgt.x - b.x, dy = tgt.y - (b.y - 48), dir = dx < 0 ? -1 : 1;
     if (dy < -60 && Math.abs(dx) < -dy * 0.6) { up = true; mx = 0; }
     else if (dy < -60) { up = true; if (!mx) mx = dir; }
-    else { if (dir !== b.face && !mx) mx = dir; if (tgt.low && !mx && b.ground) down = true; }
+    else { if (dir !== b.face && !mx && !near) mx = dir; if (tgt.low && !mx && b.ground) down = true; }
     inp.fire = Math.abs(dx) < W * 0.8;
   }
   let jump = b.ground && mx !== 0 && !groundAt(b.x + mx * 40);
